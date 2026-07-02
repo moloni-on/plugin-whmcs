@@ -1,0 +1,415 @@
+# Moloni ON WHMCS - Setup & Installation Guide
+
+## Prerequisites
+
+- **WHMCS 7.0+** installed and running
+- **PHP 7.4+** on server
+- **Composer** installed
+- **Moloni ON Account** with API access (https://www.molonion.pt/)
+- **Git** (for version control, optional but recommended)
+
+---
+
+## Step 1: Initial Project Setup
+
+### 1a. Clone or Initialize Repository
+```bash
+# Option A: Clone from git
+git clone https://github.com/your-org/moloni-on-whmcs.git
+cd moloni-on-whmcs
+
+# Option B: Create from scratch
+mkdir moloni-on-whmcs
+cd moloni-on-whmcs
+git init
+```
+
+### 1b. Install Composer Dependencies
+```bash
+composer install
+```
+
+This installs:
+- PSR logging interface
+- PHPUnit for testing
+- PHP CodeSniffer for code quality
+- Any HTTP client for API calls
+
+### 1c. Copy to WHMCS Modules Directory
+```bash
+# Copy addon module to WHMCS
+cp -r . /path/to/whmcs/modules/addons/moloni_on/
+
+# Or create symlink for development
+ln -s $(pwd) /path/to/whmcs/modules/addons/moloni_on
+```
+
+---
+
+## Step 2: Database Setup
+
+### 2a. Create Database Tables
+The module installs tables on first activation:
+
+**Tables Created:**
+
+1. **`mod_moloni_on_config`** - Settings storage
+   ```sql
+   CREATE TABLE IF NOT EXISTS `mod_moloni_on_config` (
+     `id` INT PRIMARY KEY AUTO_INCREMENT,
+     `setting_key` VARCHAR(255) UNIQUE,
+     `setting_value` LONGTEXT,
+     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+   );
+   ```
+
+2. **`mod_moloni_on_orders`** - Order tracking
+   ```sql
+   CREATE TABLE IF NOT EXISTS `mod_moloni_on_orders` (
+     `id` INT PRIMARY KEY AUTO_INCREMENT,
+     `order_id` INT UNIQUE NOT NULL,
+     `moloni_document_id` VARCHAR(255),
+     `document_type` VARCHAR(50),
+     `status` ENUM('pending','synced','discarded','failed') DEFAULT 'pending',
+     `error_message` TEXT,
+     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     `synced_at` TIMESTAMP NULL,
+     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+     FOREIGN KEY (`order_id`) REFERENCES `tblorders`(`id`) ON DELETE CASCADE
+   );
+   ```
+
+3. **`mod_moloni_on_logs`** - Application logs
+   ```sql
+   CREATE TABLE IF NOT EXISTS `mod_moloni_on_logs` (
+     `id` INT PRIMARY KEY AUTO_INCREMENT,
+     `level` ENUM('debug','info','notice','warning','error','critical') DEFAULT 'info',
+     `message` TEXT,
+     `context` JSON,
+     `order_id` INT,
+     `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     KEY `idx_level` (`level`),
+     KEY `idx_timestamp` (`timestamp`)
+   );
+   ```
+
+4. **`mod_moloni_on_documents`** - Created documents (persist each document created in Moloni ON)
+   ```sql
+   CREATE TABLE IF NOT EXISTS `mod_moloni_on_documents` (
+     `id` INT PRIMARY KEY AUTO_INCREMENT,
+     `order_id` INT NOT NULL,
+     `order_total` FLOAT,
+     `invoice_id` INT,
+     `invoice_date` DATE,
+     `invoice_status` INT,
+     `invoice_total` FLOAT,
+     `value` FLOAT,
+     KEY `idx_order_id` (`order_id`),
+     KEY `idx_invoice_id` (`invoice_id`)
+   );
+   ```
+
+   Equivalent WHMCS/Illuminate schema (used by the Installer):
+   ```php
+   $table->increments('id');
+   $table->integer('order_id');
+   $table->float('order_total');
+   $table->integer('invoice_id');
+   $table->date('invoice_date');
+   $table->integer('invoice_status');
+   $table->float('invoice_total');
+   $table->float('value');
+   ```
+
+### 2b. Automate Table Creation (Optional)
+Create `/src/Moloni/Database/Installer.php`:
+```php
+<?php
+namespace Moloni\Database;
+
+class Installer {
+    public static function install() {
+        // Create tables on module activation
+        // Called from moloni_on.php activate_hook
+    }
+    
+    public static function uninstall() {
+        // Drop tables on module deactivation (optional)
+    }
+}
+```
+
+---
+
+## Step 3: Activate in WHMCS
+
+### 3a. Module Activation
+1. Log into **WHMCS Admin Panel**
+2. Navigate: **Setup** → **Addon Modules**
+3. Find **Moloni ON** in the list
+4. Click **Activate**
+5. Confirm message: "Moloni ON addon module activated"
+
+### 3b. Grant Permissions (if needed)
+1. Go to **Setup** → **Admin Roles**
+2. Select your admin role
+3. Check **Addon: Moloni ON** under permissions
+4. Save changes
+
+---
+
+## Step 4: Module Configuration
+
+### 4a. Access the Module
+1. Navigate: **Addons** → **Moloni ON**
+2. You should see the **Login** page
+
+### 4b. Authenticate with Moloni ON
+1. Go to **Moloni ON Settings** (https://www.molonion.pt/)
+2. Generate **API Key** from your account
+3. Copy the API key
+4. In WHMCS Moloni ON module, enter API key and click **Connect**
+5. On success, you're redirected to **Company Select**
+
+### 4c. Select Moloni ON Company
+1. Choose your active Moloni ON company from the list
+2. Click **Select Company**
+3. You're now redirected to the **Dashboard**
+
+---
+
+## Step 5: Configure Module Settings
+
+### 5a. Settings Page
+1. Click **Settings** tab
+2. Configure:
+   - **Default Document Type:** INVOICE, PRO_FORMA_INVOICE, SIMPLIFIED_INVOICE, INVOICE_RECEIPT, PURCHASE_ORDER
+   - **Document Status:** Draft, Finalized, etc.
+   - **Tax Exemption Setting:** Yes/No (optional)
+3. Click **Save Settings**
+
+### 5b. Test Connection
+1. Go to **Tools** tab
+2. Click **Test Moloni ON Connection**
+3. Confirm API key is valid and company is selected
+
+---
+
+## Step 6: Development & Code Quality
+
+### 6a. Install Development Tools
+Composer installs:
+- `phpunit` for testing
+- `squizlabs/php_codesniffer` for linting
+- `phpstan` for static analysis (optional)
+
+### 6b. Code Standards Check
+```bash
+# Run PHP CodeSniffer
+composer lint
+
+# Fix auto-fixable issues
+composer lint:fix
+
+# Run tests
+composer test
+
+# Run static analysis
+composer analyse
+```
+
+### 6c. Pre-commit Hook (Optional)
+Create `.git/hooks/pre-commit`:
+```bash
+#!/bin/bash
+composer lint || exit 1
+composer test || exit 1
+```
+
+Make executable:
+```bash
+chmod +x .git/hooks/pre-commit
+```
+
+---
+
+## Step 7: Create GraphQL Queries Directory
+
+GraphQL queries should be organized in `/src/Moloni/GraphQL/`:
+
+### 7a. Query Structure
+```
+/src/Moloni/GraphQL/
+├── Queries/
+│   ├── GetMe.php
+│   ├── GetCompanies.php
+│   ├── GetDocumentTypes.php
+│   ├── GetDocument.php
+│   └── GetCustomer.php
+└── Mutations/
+    ├── CreateCustomer.php
+    ├── CreateDocument.php
+    └── UpdateDocumentStatus.php
+```
+
+### 7b. Example Query Class
+```php
+<?php
+namespace Moloni\GraphQL\Queries;
+
+class GetMe {
+    private $query = <<<'GRAPHQL'
+        query GetMe {
+            me {
+                id
+                email
+                name
+            }
+        }
+    GRAPHQL;
+    
+    public function getQuery() {
+        return $this->query;
+    }
+}
+```
+
+---
+
+## Step 8: Environment Configuration
+
+### 8a. Create `.env` (if applicable)
+```
+WHMCS_PATH=/path/to/whmcs
+MOLONI_API_BASE=https://api.molonion.pt/graphql
+MOLONI_API_TIMEOUT=30
+LOG_LEVEL=info
+```
+
+### 8b. Load Environment (in moloni_on.php)
+```php
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load(); // Optional; use if you want env files
+```
+
+---
+
+## Step 9: Testing the Integration
+
+### 9a. Create a Test Order
+1. Create a WHMCS test invoice/order
+2. Go to **Moloni ON** → **Orders**
+3. See your test order in the pending list
+4. Click **Create Document**
+5. Check Moloni ON dashboard for created document
+
+### 9b. View Logs
+1. Go to **Moloni ON** → **Logs**
+2. See all actions logged with timestamps
+3. Check for errors if creation failed
+
+### 9c. Download PDF
+1. Go to **Moloni ON** → **Documents**
+2. Click **Download PDF** for any document
+3. Verify PDF is fetched from Moloni ON and downloads successfully
+
+---
+
+## Step 10: Deployment Checklist
+
+Before going live:
+
+- [ ] All tests pass (`composer test`)
+- [ ] No CodeSniffer warnings (`composer lint`)
+- [ ] API key is securely stored (not in code)
+- [ ] Database tables created successfully
+- [ ] Module activated and permissions set
+- [ ] Test order sync works end-to-end
+- [ ] PT and EN translations verified
+- [ ] Error logging working
+- [ ] PDF downloads working
+- [ ] Bulk operations tested (5+ orders)
+- [ ] Edge cases tested (failed creations, duplicates, etc.)
+
+---
+
+## Troubleshooting
+
+### Module Not Appearing in Addons List
+- Ensure `moloni_on.php` is in `/modules/addons/moloni_on/`
+- Check WHMCS error logs: `/includes/logs/`
+- Verify PHP syntax: `php -l moloni_on.php`
+
+### API Connection Failed
+- Verify API key is correct
+- Check Moloni ON API status (https://status.molonion.pt/)
+- Review logs in **Logs** tab for error details
+- Test API key from Moloni ON settings page
+
+### Documents Not Creating
+- Check **Logs** tab for creation errors
+- Verify company is selected
+- Check document type is valid
+- Ensure customer exists in Moloni ON
+
+### Database Table Errors
+- Verify MySQL user has CREATE TABLE permissions
+- Check WHMCS database connection
+- Review WHMCS error logs
+
+### CodeSniffer Issues
+```bash
+# See all issues
+composer lint
+
+# Auto-fix simple issues
+./vendor/bin/phpcs --standard=PSR12 src/ --fix
+
+# Manually fix reported issues
+```
+
+---
+
+## File Checklist (Verify All Present)
+
+```
+moloni-on-whmcs/
+├── moloni_on.php                ✓ Main entry point
+├── hooks.php                    ✓ WHMCS hooks
+├── composer.json                ✓ Dependencies
+├── phpcs.xml                    ✓ Code standards config
+├── phpunit.xml                  ✓ Test config
+├── src/                         ✓ Source code
+├── templates/                   ✓ UI templates
+├── public/                      ✓ CSS/JS/images
+├── lang/                        ✓ Translations (en.php, pt.php)
+├── tests/                       ✓ Unit & integration tests
+├── .claude/journal/             ✓ Project journal
+└── README.md                    ✓ Project overview
+```
+
+---
+
+## Next Steps
+
+1. **Review ARCHITECTURE.md** for detailed system design
+2. **Start Development:** Implement features in order
+   - Authentication → Company Select → Orders → Documents → Logs
+3. **Write Tests:** Add unit tests for each service
+4. **Monitor Logs:** Check `/mod_moloni_on_logs` table regularly
+5. **Release:** Package and distribute
+
+---
+
+## Support & Questions
+
+For issues or questions:
+1. Check logs in WHMCS Moloni ON module
+2. Review Moloni ON API docs: https://docs.molonion.pt/
+3. Check WHMCS documentation: https://docs.whmcs.com/
+4. Review project journal in `.claude/journal/`
+
+---
+
+**Version:** 1.0.0  
+**Last Updated:** July 2, 2026
