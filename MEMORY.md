@@ -1,0 +1,2 @@
+- [Moloni ON API auth](../../.claude/projects/-home-fabio-plugin-dev-plugin-whmcs/memory/moloni-on-api-auth.md) — real auth is OAuth2 (dev_id+secret→code→tokens), endpoint /v1, NOT the API-key described in planning docs
+- [Reference plugins location](../../.claude/projects/-home-fabio-plugin-dev-plugin-whmcs/memory/reference-plugins-location.md) — Moloni reference plugins live in ~/ (above project); authoritative for API schema + WHMCS structure

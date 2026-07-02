@@ -12,17 +12,18 @@
         │                         │
 ┌───────▼──────────┐    ┌────────▼────────┐
 │  moloni_on.php   │    │   hooks.php      │
-│  (Router)        │    │  (WHMCS Hooks)   │
+│  → Admin\        │    │  (WHMCS Hooks)   │
+│    Dispatcher    │    │  InvoicePaid     │
 └────────┬─────────┘    └──────────────────┘
          │
     ┌────┴───────────────────────────────────┐
     │                                        │
 ┌──▼──────────────────┐         ┌───────────▼──────────┐
 │   Services Layer    │         │  Models & Database   │
-│  - DocumentService  │         │  - Order Model       │
-│  - OrderService     │         │  - Document Model    │
-│  - LogService       │         │  - Log Model         │
-│  - SettingsService  │         │  - Company Model     │
+│  - DocumentService  │         │  - Order / Document  │
+│  - OrderService     │         │  - Config / Auth / Log│
+│  - AuthService      │         │  - Whmcs (native rd) │
+│  - Settings/Log     │         │                      │
 └──┬─────────────────┘          └────────┬─────────────┘
    │                                     │
    │            ┌────────────────────────┘
@@ -36,7 +37,7 @@
    │
 ┌──▼──────────────────────────────────┐
 │     Moloni ON GraphQL API           │
-│  https://api.molonion.pt/graphql    │
+│  https://api.molonion.pt/v1    │
 └──────────────────────────────────────┘
 
 ┌──────────────────────────────────────┐
@@ -239,49 +240,49 @@ class SettingsService {
 
 #### Key Classes:
 
-**ApiClient**
+**ApiClient** (native cURL; OAuth2 + GraphQL)
 ```php
 class ApiClient {
-    public function __construct($apiKey, $timeout = 30) {
-        // Initialize HTTP client (GuzzleHttp or cURL)
-    }
-    
-    public function request($query, $variables = []) {
-        // Execute GraphQL query
-        // Return parsed response
-    }
-    
-    public function setApiKey($apiKey) {
-        // Update authentication
-    }
-    
-    public function validateConnection() {
-        // Test if API is reachable
-        // Test if API key is valid
-    }
+    public function __construct(int $timeout = Platform::API_TIMEOUT) {}
+
+    // GraphQL: injects the active companyId + Bearer token from Context.
+    public function request(string $operation, string $query, array $variables = []): array {}
+
+    // OAuth2 authorization-code flow.
+    public function authorizeUrl(string $clientId, string $redirectUri): string {}
+    public function grant(string $clientId, string $clientSecret, string $code): array {}   // code -> tokens
+    public function refresh(string $clientId, string $clientSecret, string $refreshToken): ?array {}
 }
 ```
 
-**MoloniClient (Wrapper)**
+**MoloniClient (domain wrapper)**
 ```php
 class MoloniClient {
     public function __construct(ApiClient $apiClient) {}
-    
-    // High-level operations
-    public function getMe() {}
-    public function getCompanies() {}
-    public function selectCompany($id) {}
-    
-    public function getCustomer($taxId) {}
-    public function createCustomer($data) {}
-    
-    public function createDocument($data) {}
-    public function getDocument($id) {}
-    public function updateDocumentStatus($id, $status) {}
-    
-    public function getDocumentTypes() {}
+
+    public function getMe(): array {}
+    public function getCompanies(): array {}
+    public function getCompany(int $companyId): array {}
+    public function getDocumentSets(): array {}
+
+    public function findCustomerByVat(string $vat): ?array {}
+    public function createCustomer(array $data): array {}
+
+    public function createDocument(array $data, string $documentType = 'invoice'): array {}
+    public function updateDocumentStatus(int $id, int $status, string $documentType = 'invoice'): array {}
+    public function getDocument(int $id): array {}
+    public function getDocumentPdfToken(int $id, string $documentType = 'invoice'): array {}
+
+    public function getCountries(): array {}
+    public function findProductByReference(string $ref): ?array {}
+    public function createProduct(array $data): array {}
+    public function findTax(float $rate, string $fiscalZoneCode): ?array {}
+    public function createTax(array $data): array {}
 }
 ```
+
+> Company selection is handled by `AuthService` (persists the id to `mod_moloni_on_auth`
+> and sets `Context::$companyId`), not a `MoloniClient` call.
 
 #### GraphQL Query Builder
 
@@ -443,7 +444,7 @@ try {
    → Calls ApiClient->request()
    ↓
 6. ApiClient
-   → Makes HTTPS POST to https://api.molonion.pt/graphql
+   → Makes HTTPS POST to https://api.molonion.pt/v1
    → Sends API key in Authorization header
    → Returns parsed JSON response
    ↓
@@ -522,15 +523,15 @@ try {
 
 ## Security Considerations
 
-1. **API Key Storage**
-   - Stored in `mod_moloni_on_config.setting_value`
-   - No encryption (per requirements)
+1. **OAuth2 Credential & Token Storage**
+   - Client id/secret and access/refresh tokens stored in the single-row `mod_moloni_on_auth` table
    - Access limited to authenticated WHMCS admins
+   - Tokens auto-refresh; on refresh-token expiry the session is cleared and re-auth is required
 
 2. **API Communication**
-   - HTTPS only (enforced by Moloni ON)
-   - API key in Authorization header (not query string)
-   - Validate SSL certificates
+   - HTTPS only (enforced by Moloni ON); SSL peer + host verification enabled in the cURL client
+   - Bearer access token in the `Authorization` header (never in the query string)
+   - OAuth grant/refresh uses form-encoded POST to `/v1/auth/grant`
 
 3. **WHMCS Integration**
    - Verify admin session before operations

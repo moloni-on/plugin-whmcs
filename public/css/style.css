@@ -1,0 +1,169 @@
+/* Moloni ON WHMCS module styles. Scoped under .moloni-on to avoid clashing
+   with the WHMCS admin theme. */
+
+.moloni-on {
+    margin-bottom: 1rem;
+}
+
+.moloni-on__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: #0f1b2d;
+    color: #fff;
+    border-radius: 6px;
+}
+
+.moloni-on__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.moloni-on__brand img {
+    height: 28px;
+}
+
+.moloni-on__company {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.moloni-on__nav {
+    margin-bottom: 1rem;
+}
+
+.moloni-on__nav .nav-link.active {
+    font-weight: 600;
+}
+
+.moloni-on__nav-right {
+    margin-left: auto;
+}
+
+.moloni-on__panel {
+    background: #fff;
+    border: 1px solid #e3e7ee;
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.moloni-on__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.moloni-on__toolbar h3 {
+    margin: 0;
+    margin-right: auto;
+}
+
+.moloni-on__toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.moloni-on__doc-type {
+    max-width: 240px;
+}
+
+.moloni-on__table {
+    width: 100%;
+}
+
+.moloni-on__row-actions {
+    white-space: nowrap;
+}
+
+.moloni-on__row-actions .btn {
+    margin-right: 0.25rem;
+}
+
+.moloni-on__inline-form {
+    display: inline;
+}
+
+.moloni-on__login,
+.moloni-on__company-select {
+    max-width: 520px;
+    margin: 2rem auto;
+}
+
+.moloni-on__company-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.moloni-on__company-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #e3e7ee;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.moloni-on__company-name {
+    font-weight: 600;
+}
+
+.moloni-on__company-meta {
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+.moloni-on__level {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+}
+
+.moloni-on__level--error,
+.moloni-on__level--critical {
+    background: #dc3545;
+    color: #fff;
+}
+
+.moloni-on__level--warning {
+    background: #ffc107;
+    color: #1b1b1b;
+}
+
+.moloni-on__level--info,
+.moloni-on__level--notice {
+    background: #0d6efd;
+    color: #fff;
+}
+
+.moloni-on__level--debug {
+    background: #6c757d;
+    color: #fff;
+}
+
+.moloni-on__context {
+    display: inline-block;
+    max-width: 420px;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.moloni-on__footer {
+    text-align: center;
+    color: #8a94a6;
+    font-size: 0.8rem;
+    padding: 0.5rem 0;
+}
+
+.moloni-on__help {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}

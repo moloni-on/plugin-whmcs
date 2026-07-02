@@ -1,2 +1,27 @@
-[whmcs_moloni_pt]
-[wordpress_moloni_on]
+# Dependencies
+/vendor/
+composer.phar
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests / build
+/build/
+/dist/
+/moloni_on/
+.phpunit.result.cache
+/coverage/
+
+# Logs
+*.log

@@ -63,6 +63,20 @@ The module installs tables on first activation:
    );
    ```
 
+1b. **`mod_moloni_on_auth`** - Single-row OAuth2 session (credentials + tokens)
+   ```sql
+   CREATE TABLE IF NOT EXISTS `mod_moloni_on_auth` (
+     `id` INT PRIMARY KEY AUTO_INCREMENT,
+     `client_id` TEXT,
+     `client_secret` TEXT,
+     `access_token` TEXT,
+     `refresh_token` TEXT,
+     `access_expire` INT DEFAULT 0,
+     `refresh_expire` INT DEFAULT 0,
+     `company_id` INT DEFAULT 0
+   );
+   ```
+
 2. **`mod_moloni_on_orders`** - Order tracking
    ```sql
    CREATE TABLE IF NOT EXISTS `mod_moloni_on_orders` (
@@ -164,11 +178,17 @@ class Installer {
 1. Navigate: **Addons** → **Moloni ON**
 2. You should see the **Login** page
 
-### 4b. Authenticate with Moloni ON
-1. Go to **Moloni ON Settings** (https://www.molonion.pt/)
-2. Generate **API Key** from your account
-3. Copy the API key
-4. In WHMCS Moloni ON module, enter API key and click **Connect**
+### 4b. Authenticate with Moloni ON (OAuth2)
+The module uses the Moloni ON OAuth2 authorization-code flow — there is no
+static API key.
+1. In your Moloni ON account, create an **API client** to obtain an **API Client ID**
+   (developer id) and a **Client Secret**
+2. In the WHMCS Moloni ON module login page, enter the **API Client ID** and **Client Secret**
+   and click **Connect**
+3. You're redirected to the Moloni ON authorization center (https://ac.molonion.pt/) to
+   authorize this WHMCS installation
+4. After authorizing, Moloni ON redirects back to the module with a `code`, which the module
+   exchanges for **access** and **refresh** tokens (stored in `mod_moloni_on_auth`)
 5. On success, you're redirected to **Company Select**
 
 ### 4c. Select Moloni ON Company
@@ -233,95 +253,73 @@ chmod +x .git/hooks/pre-commit
 
 ---
 
-## Step 7: Create GraphQL Queries Directory
+## Step 7: GraphQL Operations
 
-GraphQL queries should be organized in `/src/Moloni/GraphQL/`:
+Each GraphQL operation is a PHP class under `/src/Moloni/GraphQL/` extending
+`AbstractOperation`. The GraphQL document lives in the `QUERY` constant; `operation()`
+returns the root field name (used to locate `data`/`errors` in the response) and
+`variables($data)` builds the payload.
 
-### 7a. Query Structure
 ```
 /src/Moloni/GraphQL/
-├── Queries/
-│   ├── GetMe.php
-│   ├── GetCompanies.php
-│   ├── GetDocumentTypes.php
-│   ├── GetDocument.php
-│   └── GetCustomer.php
-└── Mutations/
-    ├── CreateCustomer.php
-    ├── CreateDocument.php
-    └── UpdateDocumentStatus.php
+├── Queries/    GetMe, GetCompanies, GetCompany, GetCustomers, GetDocument,
+│               GetDocumentSets, GetCountries, GetProducts, GetTaxes, ...
+└── Mutations/  CreateCustomer, CreateDocument, UpdateDocumentStatus,
+                CreateProduct, CreateTax
 ```
 
-### 7b. Example Query Class
 ```php
 <?php
 namespace Moloni\GraphQL\Queries;
 
-class GetMe {
-    private $query = <<<'GRAPHQL'
-        query GetMe {
-            me {
-                id
-                email
-                name
-            }
-        }
+use Moloni\GraphQL\AbstractOperation;
+
+class GetMe extends AbstractOperation
+{
+    protected const OPERATION = 'me';
+
+    protected const QUERY = <<<'GRAPHQL'
+    query { me { data { userCompanies { company { companyId } } } errors { field msg } } }
     GRAPHQL;
-    
-    public function getQuery() {
-        return $this->query;
-    }
 }
 ```
 
----
+> Queries are embedded as PHP string constants (not separate `.graphql` files), so IDE
+> GraphQL schema autocomplete is not available for them by design.
 
-## Step 8: Environment Configuration
-
-### 8a. Create `.env` (if applicable)
-```
-WHMCS_PATH=/path/to/whmcs
-MOLONI_API_BASE=https://api.molonion.pt/graphql
-MOLONI_API_TIMEOUT=30
-LOG_LEVEL=info
-```
-
-### 8b. Load Environment (in moloni_on.php)
-```php
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-$dotenv->load(); // Optional; use if you want env files
-```
+Endpoint and OAuth constants live in `src/Moloni/Support/Platform.php`
+(`API_URL = https://api.molonion.pt/v1`); there is no `.env` file.
 
 ---
 
-## Step 9: Testing the Integration
+## Step 8: Testing the Integration
 
-### 9a. Create a Test Order
+### 8a. Create a Test Order
 1. Create a WHMCS test invoice/order
 2. Go to **Moloni ON** → **Orders**
 3. See your test order in the pending list
 4. Click **Create Document**
 5. Check Moloni ON dashboard for created document
 
-### 9b. View Logs
+### 8b. View Logs
 1. Go to **Moloni ON** → **Logs**
 2. See all actions logged with timestamps
 3. Check for errors if creation failed
 
-### 9c. Download PDF
+### 8c. Download PDF
 1. Go to **Moloni ON** → **Documents**
 2. Click **Download PDF** for any document
 3. Verify PDF is fetched from Moloni ON and downloads successfully
 
 ---
 
-## Step 10: Deployment Checklist
+## Step 9: Deployment Checklist
 
 Before going live:
 
 - [ ] All tests pass (`composer test`)
 - [ ] No CodeSniffer warnings (`composer lint`)
-- [ ] API key is securely stored (not in code)
+- [ ] OAuth credentials/tokens stored in `mod_moloni_on_auth` (not in code)
 - [ ] Database tables created successfully
 - [ ] Module activated and permissions set
 - [ ] Test order sync works end-to-end

@@ -1,0 +1,48 @@
+{
+  "name": "moloni-on/whmcs",
+  "description": "Moloni ON addon module for WHMCS - syncs WHMCS orders into Moloni ON as invoices/documents",
+  "license": "proprietary",
+  "type": "project",
+  "authors": [
+    {
+      "name": "Moloni",
+      "email": "suporte@molonion.pt"
+    }
+  ],
+  "require": {
+    "php": ">=7.4",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "psr/log": "^1.1"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5",
+    "squizlabs/php_codesniffer": "^3.7"
+  },
+  "autoload": {
+    "psr-4": {
+      "Moloni\\": "src/Moloni/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Moloni\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "lint": "phpcs",
+    "lint:fix": "phpcbf",
+    "build": "bash build.sh",
+    "build:install": "bash build.sh --install"
+  },
+  "scripts-descriptions": {
+    "build": "Package the addon into dist/moloni_on.zip (reuses vendor/).",
+    "build:install": "Reinstall prod (no-dev) dependencies, then package into dist/moloni_on.zip."
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}
