@@ -54,14 +54,27 @@ tests/                 PHPUnit (Unit, Feature)
 
 ## Development
 
-No PHP is required locally if you use Docker:
+No PHP is required locally — use the Docker Compose `tools` service:
 
 ```bash
-docker run --rm -v "$PWD":/app -w /app composer:2 bash -c '\
-  composer install && vendor/bin/phpunit && vendor/bin/phpcs --standard=phpcs.xml'
+docker compose run --rm tools install   # composer install
+docker compose run --rm tools test      # PHPUnit
+docker compose run --rm tools lint      # PHP CodeSniffer (PSR-12)
+docker compose run --rm tools build     # package -> dist/moloni_on.zip
 ```
 
-Composer scripts (inside a PHP environment): `composer test`, `composer lint`, `composer lint:fix`.
+Inside a PHP environment the same runs as `composer test` / `lint` / `lint:fix` / `build`.
+
+### Full WHMCS runtime (optional)
+
+WHMCS is proprietary and can't be pulled from a registry, so download your licensed release
+into `./whmcs`, then start the `whmcs` profile (php-apache + MariaDB, addon mounted live):
+
+```bash
+docker compose --profile whmcs up -d      # WHMCS at http://localhost:8080
+```
+
+WHMCS needs the ionCube Loader — see [docker/whmcs.Dockerfile](docker/whmcs.Dockerfile).
 
 ## Build / release
 

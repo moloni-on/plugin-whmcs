@@ -1,0 +1,69 @@
+# Docker Compose for developing/testing the Moloni ON WHMCS addon.
+#
+# Two ways to use it:
+#
+# 1) Tooling (works out of the box — no WHMCS or PHP needed locally):
+#      docker compose run --rm tools install     # composer install
+#      docker compose run --rm tools test        # PHPUnit
+#      docker compose run --rm tools lint         # PHP CodeSniffer (PSR-12)
+#      docker compose run --rm tools build:install# package -> dist/moloni_on.zip
+#
+# 2) Full WHMCS runtime (profile "whmcs") — for manual/integration testing.
+#    WHMCS is proprietary and cannot be pulled from a registry, so you must
+#    place your licensed WHMCS release in ./whmcs first, then:
+#      docker compose --profile whmcs up -d
+#      # WHMCS admin: http://localhost:8080/admin  (DB host: db, name/user/pass: whmcs)
+#    The addon is mounted live at modules/addons/moloni_on.
+
+name: moloni-on-whmcs
+
+services:
+  # ---- Dev/test toolchain -------------------------------------------------
+  tools:
+    image: composer:2
+    working_dir: /app
+    environment:
+      COMPOSER_ALLOW_SUPERUSER: "1"
+    volumes:
+      - .:/app
+    entrypoint: ["composer"]
+    # `run` (not `up`): one-off commands. Default shows available scripts.
+    command: ["list"]
+
+  # ---- Optional full WHMCS runtime (profile: whmcs) -----------------------
+  db:
+    image: mariadb:10.6
+    profiles: ["whmcs"]
+    environment:
+      MARIADB_DATABASE: whmcs
+      MARIADB_USER: whmcs
+      MARIADB_PASSWORD: whmcs
+      MARIADB_ROOT_PASSWORD: root
+    volumes:
+      - db-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  whmcs:
+    build:
+      context: ./docker
+      dockerfile: whmcs.Dockerfile
+    profiles: ["whmcs"]
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    volumes:
+      # Your licensed WHMCS release (download into ./whmcs first).
+      - ./whmcs:/var/www/html
+      # The addon, mounted live so code changes are picked up immediately.
+      - .:/var/www/html/modules/addons/moloni_on
+
+volumes:
+  db-data:

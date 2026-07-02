@@ -14,8 +14,8 @@ $companyName = $company['name'] ?? '';
 <div class="moloni-on">
     <div class="moloni-on__topbar">
         <div class="moloni-on__brand">
-            <img src="<?= $e($asset('img/logo.png')) ?>" alt="Moloni ON" onerror="this.style.display='none'">
-            <span><?= $e($lang('module_name')) ?></span>
+            <img class="moloni-on__logo" src="<?= $e($asset('img/logo.svg')) ?>"
+                 alt="<?= $e($lang('module_name')) ?>">
         </div>
         <?php if ($companyName !== ''): ?>
             <div class="moloni-on__company">

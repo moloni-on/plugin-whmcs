@@ -10,8 +10,9 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1rem;
-    background: #0f1b2d;
-    color: #fff;
+    background: #fff;
+    color: #1e1353;
+    border: 1px solid #e3e7ee;
     border-radius: 6px;
 }
 
@@ -19,17 +20,17 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-weight: 600;
-    font-size: 1.1rem;
 }
 
-.moloni-on__brand img {
-    height: 28px;
+.moloni-on__logo {
+    height: 30px;
+    width: auto;
+    display: block;
 }
 
 .moloni-on__company {
     font-size: 0.9rem;
-    opacity: 0.9;
+    color: #6c757d;
 }
 
 .moloni-on__nav {

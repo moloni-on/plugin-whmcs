@@ -25,3 +25,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local WHMCS runtime (proprietary; supplied by the developer)
+/whmcs/
