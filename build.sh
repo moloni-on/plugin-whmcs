@@ -32,7 +32,15 @@ for dir in src templates public lang vendor; do
 done
 
 mkdir -p "$DIST"
-zip -rq "$DIST/$MODULE.zip" "$MODULE"
+if command -v zip >/dev/null 2>&1; then
+    zip -rq "$DIST/$MODULE.zip" "$MODULE"
+elif command -v python3 >/dev/null 2>&1; then
+    # Fallback when the `zip` binary isn't installed (e.g. minimal WSL).
+    python3 -c "import shutil,sys; shutil.make_archive(sys.argv[1], 'zip', root_dir='.', base_dir=sys.argv[2])" "$DIST/$MODULE" "$MODULE"
+else
+    echo "error: need either 'zip' or 'python3' to package the module" >&2
+    exit 1
+fi
 rm -rf "$MODULE"
 
 echo "Built $DIST/$MODULE.zip"
