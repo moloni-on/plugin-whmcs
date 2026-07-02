@@ -34,7 +34,9 @@ class TaxResolver
      */
     public function resolve(float $rate, array $fiscalZone): array
     {
-        $code = strtolower($fiscalZone['code'] ?? 'pt');
+        // Normalise the zone code once; Moloni stores fiscal-zone codes in
+        // upper case, so both the lookup and any created tax use that form.
+        $code = strtoupper((string) ($fiscalZone['code'] ?? 'PT'));
         $key = $rate . '|' . $code;
 
         if (isset($this->cache[$key])) {
@@ -44,25 +46,22 @@ class TaxResolver
         $tax = $this->client->findTax($rate, $code);
 
         if ($tax === null || empty($tax['taxId'])) {
-            $tax = $this->create($rate, $fiscalZone);
+            $tax = $this->create($rate, $code, (int) ($fiscalZone['countryId'] ?? 0));
         }
 
         return $this->cache[$key] = $tax;
     }
 
     /**
-     * @param array{code:string,countryId:int} $fiscalZone
      * @return array<string,mixed>
      */
-    private function create(float $rate, array $fiscalZone): array
+    private function create(float $rate, string $code, int $countryId): array
     {
-        $code = $fiscalZone['code'] ?? 'PT';
-
         return $this->client->createTax([
             'visible' => 1,
-            'name' => 'VAT - ' . strtoupper($code) . ' - ' . $rate . '%',
+            'name' => 'VAT - ' . $code . ' - ' . $rate . '%',
             'fiscalZone' => $code,
-            'countryId' => (int) ($fiscalZone['countryId'] ?? 0),
+            'countryId' => $countryId,
             'type' => TaxType::PERCENTAGE,
             'fiscalZoneFinanceType' => TaxFiscalZoneType::VAT,
             'isDefault' => false,

@@ -59,6 +59,10 @@ add_hook('InvoicePaid', 1, static function (array $vars): void {
             return;
         }
 
+        // Populate Context::$company so the document uses the right fiscal zone
+        // (the admin UI does this in the dispatcher; the hook must do it too).
+        $auth->loadCompany();
+
         (new DocumentService($moloni, $settings))->createDocumentFromOrder($orderId);
     } catch (Throwable $e) {
         LoggerFacade::error('Automatic document creation failed.', ['error' => $e->getMessage()]);

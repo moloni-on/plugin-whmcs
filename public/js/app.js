@@ -39,5 +39,47 @@
                 });
             });
         });
+
+        // Log-context overlay: show a row's context in a modal instead of
+        // printing raw JSON inline. Falls back to a <noscript> inline block.
+        var overlay = document.querySelector('[data-moloni-overlay]');
+        if (overlay) {
+            var body = overlay.querySelector('[data-moloni-overlay-body]');
+
+            var openOverlay = function (raw) {
+                var text = raw;
+                try {
+                    text = JSON.stringify(JSON.parse(raw), null, 2);
+                } catch (e) {
+                    // Not JSON — show the raw string as-is.
+                }
+                body.textContent = text;
+                overlay.hidden = false;
+            };
+
+            var closeOverlay = function () {
+                overlay.hidden = true;
+                body.textContent = '';
+            };
+
+            document.querySelectorAll('[data-moloni-log-context]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    openOverlay(btn.getAttribute('data-moloni-log-context') || '');
+                });
+            });
+
+            overlay.addEventListener('click', function (event) {
+                // Close when clicking the backdrop or the close button.
+                if (event.target === overlay || event.target.closest('[data-moloni-overlay-close]')) {
+                    closeOverlay();
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && !overlay.hidden) {
+                    closeOverlay();
+                }
+            });
+        }
     });
 })();

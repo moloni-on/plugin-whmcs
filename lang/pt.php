@@ -113,6 +113,15 @@ return [
     'clear_logs' => 'Limpar todos os registos',
     'confirm_clear_logs' => 'Elimino todos os registos? Não posso anular esta ação.',
     'logs_cleared' => 'Limpei os registos.',
+    'view_context' => 'Ver',
+    'log_context_title' => 'Contexto do registo',
+    'close' => 'Fechar',
+
+    // OAuth / diversos
+    'oauth_state_mismatch' => 'A autorização falhou: o token de segurança não corresponde. Volto a tentar ligar-me.',
+    'redirecting' => 'A redirecionar para o Moloni ON…',
+    'redirect_continue' => 'continuar',
+    'pdf_download_failed' => 'Não consegui transferir o PDF.',
 
     // Resultados de operações
     'order_discarded' => 'Descartei a encomenda.',

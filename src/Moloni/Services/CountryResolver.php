@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Moloni\Services;
 
 use Moloni\Api\MoloniClient;
-use Moloni\Exceptions\ApiException;
+use Moloni\Facades\LoggerFacade;
 use Throwable;
 
 /**
@@ -45,7 +45,9 @@ class CountryResolver
 
         try {
             $countries = $this->client->getCountries();
-        } catch (ApiException | Throwable $e) {
+        } catch (Throwable $e) {
+            LoggerFacade::warning('Could not load Moloni ON countries.', ['error' => $e->getMessage()]);
+
             return;
         }
 

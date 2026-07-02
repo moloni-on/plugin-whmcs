@@ -122,11 +122,17 @@ class ApiClient
     /**
      * Build the OAuth2 authorize URL to redirect the admin to.
      */
-    public function authorizeUrl(string $clientId, string $redirectUri): string
+    public function authorizeUrl(string $clientId, string $redirectUri, string $state = ''): string
     {
-        return Platform::AUTH_AUTHORIZE
+        $url = Platform::AUTH_AUTHORIZE
             . '?apiClientId=' . rawurlencode($clientId)
             . '&redirectUri=' . rawurlencode($redirectUri);
+
+        if ($state !== '') {
+            $url .= '&state=' . rawurlencode($state);
+        }
+
+        return $url;
     }
 
     /**
@@ -139,9 +145,12 @@ class ApiClient
             throw new ApiException('Moloni ON API error.', ['errors' => $parsed['errors']]);
         }
 
+        // Moloni returns validation/business errors in the per-operation
+        // `errors` node, sometimes alongside a partial `data` node. Treat any
+        // non-empty operation error as fatal so failures are never swallowed.
         $operationErrors = $parsed['data'][$operation]['errors'] ?? [];
 
-        if (!empty($operationErrors) && empty($parsed['data'][$operation]['data'])) {
+        if (!empty($operationErrors)) {
             throw new ApiException('Moloni ON API rejected the request.', ['errors' => $operationErrors]);
         }
     }

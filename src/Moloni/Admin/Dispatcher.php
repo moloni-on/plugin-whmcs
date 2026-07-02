@@ -70,13 +70,22 @@ class Dispatcher
                 return $this->connect();
             }
 
-            // 2. Complete the OAuth callback (code exchange).
-            if (isset($_GET['code'])) {
+            $authenticated = $this->container->auth()->ensureAuthenticated();
+
+            // 2. Complete the OAuth callback (code exchange). Only when not
+            // already authenticated, and only after validating the CSRF state
+            // nonce we issued when starting the flow.
+            if (!$authenticated && isset($_GET['code'])) {
+                if (!$this->container->auth()->verifyState((string) ($_GET['state'] ?? ''))) {
+                    throw new AuthException(Lang::get('oauth_state_mismatch'));
+                }
+
                 $this->container->auth()->exchangeCode((string) $_GET['code']);
+                $authenticated = $this->container->auth()->ensureAuthenticated();
             }
 
             // 3. Require a valid session.
-            if (!$this->container->auth()->ensureAuthenticated()) {
+            if (!$authenticated) {
                 return $this->renderStandalone('login');
             }
 
@@ -234,12 +243,16 @@ class Dispatcher
         } catch (MoloniException $e) {
             LoggerFacade::error('PDF download failed.', ['document_id' => $documentId, 'error' => $e->getMessage()]);
             header('HTTP/1.1 500 Internal Server Error');
-            echo 'Could not download PDF.';
+            echo Lang::get('pdf_download_failed');
             exit;
         }
 
+        // Never let an API-supplied filename inject CRLF/quotes into the header.
+        $filename = (string) preg_replace('/[^A-Za-z0-9._-]+/', '_', $pdf['filename']);
+        $filename = $filename !== '' ? $filename : ('document-' . $documentId . '.pdf');
+
         header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="' . $pdf['filename'] . '"');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Content-Length: ' . strlen($pdf['content']));
         echo $pdf['content'];
         exit;
@@ -334,6 +347,8 @@ class Dispatcher
         try {
             return $this->container->moloniClient()->getDocumentSets();
         } catch (Throwable $e) {
+            LoggerFacade::warning('Could not load document sets.', ['error' => $e->getMessage()]);
+
             return [];
         }
     }
@@ -379,10 +394,11 @@ class Dispatcher
     private function redirect(string $url): string
     {
         $safe = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        $link = '<a href="' . $safe . '">' . Lang::get('redirect_continue') . '</a>';
 
         return '<meta http-equiv="refresh" content="0;url=' . $safe . '">'
             . '<script>window.location.href=' . json_encode($url) . ';</script>'
-            . '<p>Redirecting to Moloni ON… <a href="' . $safe . '">continue</a>.</p>';
+            . '<p>' . Lang::get('redirecting') . ' ' . $link . '.</p>';
     }
 
     private function absoluteModuleUrl(): string

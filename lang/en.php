@@ -111,6 +111,15 @@ return [
     'clear_logs' => 'Clear all logs',
     'confirm_clear_logs' => 'Delete all log entries? This cannot be undone.',
     'logs_cleared' => 'Logs cleared.',
+    'view_context' => 'View',
+    'log_context_title' => 'Log context',
+    'close' => 'Close',
+
+    // OAuth / misc
+    'oauth_state_mismatch' => 'Authorization failed: the security token did not match. Please try connecting again.',
+    'redirecting' => 'Redirecting to Moloni ON…',
+    'redirect_continue' => 'continue',
+    'pdf_download_failed' => 'Could not download PDF.',
 
     // Operation results
     'order_discarded' => 'Order discarded.',

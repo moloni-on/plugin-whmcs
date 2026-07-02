@@ -7,6 +7,7 @@ namespace Moloni\Services;
 use Moloni\Api\MoloniClient;
 use Moloni\Enums\ProductType;
 use Moloni\Enums\ProductTypeAT;
+use Moloni\Exceptions\ApiException;
 
 /**
  * Resolves a Moloni ON product id for a WHMCS line item.
@@ -34,7 +35,7 @@ class ProductResolver
      * Return the Moloni product id for the given item, creating it if needed.
      *
      * @param array<int,array<string,mixed>> $taxes  Product taxes ({taxId,value,ordering}).
-     * @throws \Moloni\Exceptions\ApiException
+     * @throws ApiException
      */
     public function resolveId(
         string $name,
@@ -58,8 +59,13 @@ class ProductResolver
 
         $insert = $this->buildInsert($name, $reference, $price, $taxes, $exemptionReason);
         $created = $this->client->createProduct($insert);
+        $productId = (int) ($created['productId'] ?? 0);
 
-        return $this->cache[$reference] = (int) ($created['productId'] ?? 0);
+        if ($productId <= 0) {
+            throw new ApiException('Moloni ON did not return a product id.', ['reference' => $reference]);
+        }
+
+        return $this->cache[$reference] = $productId;
     }
 
     /**

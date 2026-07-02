@@ -21,6 +21,12 @@ use Moloni\Support\Context;
  */
 class AuthService
 {
+    /** Session key holding the one-time OAuth CSRF `state`. */
+    private const STATE_KEY = 'moloni_on_oauth_state';
+
+    /** Refresh access tokens this many seconds before they actually expire. */
+    private const EXPIRY_SKEW = 60;
+
     private ApiClient $api;
 
     private MoloniClient $client;
@@ -47,7 +53,33 @@ class AuthService
         $row = Auth::row();
         $clientId = (string) ($row['client_id'] ?? '');
 
-        return $this->api->authorizeUrl($clientId, $redirectUri);
+        return $this->api->authorizeUrl($clientId, $redirectUri, $this->issueState());
+    }
+
+    /**
+     * Generate and remember a one-time CSRF `state` for the OAuth redirect.
+     */
+    private function issueState(): string
+    {
+        $state = bin2hex(random_bytes(16));
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION[self::STATE_KEY] = $state;
+        }
+
+        return $state;
+    }
+
+    /**
+     * Validate (and consume) the `state` returned on the OAuth callback.
+     * Fails closed when no state was issued for this session.
+     */
+    public function verifyState(string $state): bool
+    {
+        $expected = $_SESSION[self::STATE_KEY] ?? '';
+        unset($_SESSION[self::STATE_KEY]);
+
+        return $state !== '' && is_string($expected) && $expected !== '' && hash_equals($expected, $state);
     }
 
     /**
@@ -64,7 +96,7 @@ class AuthService
         }
 
         $tokens = $this->api->grant((string) $row['client_id'], (string) $row['client_secret'], $code);
-        Auth::setTokens($tokens['accessToken'], $tokens['refreshToken']);
+        $this->storeTokens($tokens);
 
         LoggerFacade::info('Authenticated with Moloni ON.');
     }
@@ -81,7 +113,7 @@ class AuthService
             return false;
         }
 
-        if ((int) $row['access_expire'] <= time()) {
+        if ((int) $row['access_expire'] - self::EXPIRY_SKEW <= time()) {
             if (!$this->refresh($row)) {
                 return false;
             }
@@ -151,8 +183,23 @@ class AuthService
             return false;
         }
 
-        Auth::setTokens($tokens['accessToken'], $tokens['refreshToken']);
+        $this->storeTokens($tokens);
 
         return true;
+    }
+
+    /**
+     * Persist tokens, honouring the lifetimes the OAuth endpoint returned.
+     *
+     * @param array<string,mixed> $tokens
+     */
+    private function storeTokens(array $tokens): void
+    {
+        Auth::setTokens(
+            (string) $tokens['accessToken'],
+            (string) $tokens['refreshToken'],
+            (int) ($tokens['expiresIn'] ?? 3000),
+            (int) ($tokens['refreshExpiresIn'] ?? 864000)
+        );
     }
 }

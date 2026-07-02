@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Moloni\Services;
 
 use Moloni\Api\MoloniClient;
+use Moloni\Enums\DocumentStatus;
 use Moloni\Enums\DocumentType;
 use Moloni\Exceptions\ApiException;
 use Moloni\Exceptions\DocumentException;
+use Moloni\Exceptions\MoloniException;
 use Moloni\Exceptions\ValidationException;
 use Moloni\Facades\LoggerFacade;
 use Moloni\Models\Document;
@@ -73,12 +75,16 @@ class DocumentService
             $items = $order->invoiceid ? Whmcs::getInvoiceItems((int) $order->invoiceid) : [];
             $fiscalZone = $this->fiscalZone();
 
+            $wantedStatus = $this->settings->documentStatus();
+
             $payload = [
                 'customerId' => $customerId,
                 'documentSetId' => $this->settings->documentSetId(),
                 'fiscalZone' => $fiscalZone['code'],
                 'date' => date('Y-m-d H:i:s'),
-                'status' => $this->settings->documentStatus(),
+                // Always create as draft; the document is only closed afterwards
+                // once we've confirmed Moloni's total matches the order total.
+                'status' => DocumentStatus::DRAFT,
                 'ourReference' => '#' . ($order->ordernum ?: $order->id),
                 'yourReference' => '#' . ($order->ordernum ?: $order->id),
                 'products' => $this->resolveProductLines($items, (float) $order->amount, $invoice, $fiscalZone),
@@ -91,23 +97,39 @@ class DocumentService
                 throw new DocumentException('Moloni ON did not return a document id.', ['order_id' => $orderId]);
             }
 
-            $this->persist($order, $documentId, (float) ($result['documentTotal'] ?? $order->amount), $documentType);
+            $orderTotal = (float) $order->amount;
+            $documentTotal = (float) ($result['documentTotal'] ?? $orderTotal);
+            $status = $this->closeIfRequested(
+                $documentId,
+                $documentType,
+                $wantedStatus,
+                $orderTotal,
+                $documentTotal,
+                $orderId
+            );
+
+            $this->persist($order, $documentId, $documentTotal, $documentType, $status);
 
             LoggerFacade::info('Document created.', [
                 'order_id' => $orderId,
                 'document_id' => $documentId,
+                'status' => $status,
             ], $orderId);
 
             return $documentId;
-        } catch (ApiException $e) {
+        } catch (Throwable $e) {
+            // Any failure (API, validation, resolver, DB) must mark the order
+            // failed and be logged with context — never a silent partial abort.
+            $data = $e instanceof MoloniException ? $e->getData() : [];
+
             Order::markFailed($orderId, $e->getMessage());
             LoggerFacade::error('Document creation failed.', [
                 'order_id' => $orderId,
                 'error' => $e->getMessage(),
-                'data' => $e->getData(),
+                'data' => $data,
             ], $orderId);
 
-            throw new DocumentException($e->getMessage(), $e->getData(), 0, $e);
+            throw new DocumentException($e->getMessage(), $data, 0, $e);
         }
     }
 
@@ -234,8 +256,13 @@ class DocumentService
         }
 
         $created = $this->client->createCustomer($data);
+        $customerId = (int) ($created['customerId'] ?? 0);
 
-        return (int) ($created['customerId'] ?? 0);
+        if ($customerId <= 0) {
+            throw new ApiException('Moloni ON did not return a customer id.', ['response' => $created]);
+        }
+
+        return $customerId;
     }
 
     /**
@@ -257,7 +284,12 @@ class DocumentService
         $rates = $this->invoiceTaxRates($invoice);
 
         if ($items === []) {
-            return [$this->buildLine('Order total', $orderTotal, $rates, $fiscalZone, 1, 'WHMCS-ORDER-TOTAL')];
+            // $orderTotal (tblorders.amount) is tax-inclusive, but Moloni adds
+            // VAT on top of the line price, so send the net amount to avoid
+            // double-taxing (mirrors the net per-item amounts below).
+            $price = $this->netAmount($orderTotal, $rates);
+
+            return [$this->buildLine('Order total', $price, $rates, $fiscalZone, 1, 'WHMCS-ORDER-TOTAL')];
         }
 
         $lines = [];
@@ -326,6 +358,26 @@ class DocumentService
     }
 
     /**
+     * Convert a tax-inclusive amount to its net value for the given VAT rates.
+     * Line taxes are applied non-cumulatively, so the divisor is 1 + the sum
+     * of the rates. Returns the amount unchanged when there is no tax.
+     *
+     * @param array<int,float> $rates
+     */
+    private function netAmount(float $gross, array $rates): float
+    {
+        $totalRate = 0.0;
+
+        foreach ($rates as $rate) {
+            if ($rate > 0) {
+                $totalRate += $rate;
+            }
+        }
+
+        return $totalRate > 0.0 ? $gross / (1 + $totalRate / 100) : $gross;
+    }
+
+    /**
      * The distinct positive VAT rates on a WHMCS invoice (taxrate, taxrate2).
      *
      * @param object|null $invoice tblinvoices row
@@ -366,9 +418,53 @@ class DocumentService
     }
 
     /**
+     * Close a freshly-created draft when — and only when — the operator asked
+     * for a closed document AND Moloni's computed total matches the WHMCS order
+     * total. A mismatch means the line mapping is off, so the document is left
+     * as a draft for manual review rather than being locked as closed.
+     *
+     * @return int The document's final status (DRAFT or CLOSED).
+     */
+    private function closeIfRequested(
+        int $documentId,
+        string $documentType,
+        int $wantedStatus,
+        float $orderTotal,
+        float $documentTotal,
+        int $orderId
+    ): int {
+        if ($wantedStatus !== DocumentStatus::CLOSED) {
+            return DocumentStatus::DRAFT;
+        }
+
+        if (!$this->totalsMatch($orderTotal, $documentTotal)) {
+            LoggerFacade::warning('Document left as draft: totals do not match.', [
+                'order_id' => $orderId,
+                'document_id' => $documentId,
+                'order_total' => $orderTotal,
+                'document_total' => $documentTotal,
+            ], $orderId);
+
+            return DocumentStatus::DRAFT;
+        }
+
+        $this->client->updateDocumentStatus($documentId, DocumentStatus::CLOSED, $documentType);
+
+        return DocumentStatus::CLOSED;
+    }
+
+    /**
+     * Compare two monetary totals, tolerating floating-point rounding noise.
+     */
+    private function totalsMatch(float $a, float $b): bool
+    {
+        return abs($a - $b) < 0.01;
+    }
+
+    /**
      * @param object $order tblorders row
      */
-    private function persist($order, int $documentId, float $documentTotal, string $documentType): void
+    private function persist($order, int $documentId, float $documentTotal, string $documentType, int $status): void
     {
         Order::markSynced((int) $order->id, (string) $documentId, $documentType);
 
@@ -377,7 +473,7 @@ class DocumentService
             'order_total' => (float) $order->amount,
             'invoice_id' => $documentId,
             'invoice_date' => date('Y-m-d'),
-            'invoice_status' => $this->settings->documentStatus(),
+            'invoice_status' => $status,
             'invoice_total' => $documentTotal,
             'value' => (float) $order->amount,
         ]);
@@ -395,8 +491,18 @@ class DocumentService
         ]);
 
         $content = curl_exec($ch);
+        $error = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        return $content === false ? '' : (string) $content;
+        if ($content === false) {
+            throw new DocumentException('Could not download PDF from Moloni ON: ' . $error);
+        }
+
+        if ($status >= 400) {
+            throw new DocumentException('Moloni ON media API returned HTTP ' . $status . '.');
+        }
+
+        return (string) $content;
     }
 }

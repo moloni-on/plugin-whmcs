@@ -56,12 +56,28 @@ $activeLevel = (string) ($_GET['level'] ?? '');
                         <td><?= $e($log->order_id ?? '') ?></td>
                         <td>
                             <?php if (!empty($log->context)): ?>
-                                <code class="moloni-on__context"><?= $e($log->context) ?></code>
+                                <button type="button" class="btn btn-link btn-sm moloni-on__context-btn"
+                                        data-moloni-log-context="<?= $e($log->context) ?>">
+                                    <?= $e($lang('view_context')) ?>
+                                </button>
+                                <noscript><code class="moloni-on__context"><?= $e($log->context) ?></code></noscript>
                             <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
+
+        <div class="moloni-on__overlay" data-moloni-overlay hidden>
+            <div class="moloni-on__overlay-dialog" role="dialog" aria-modal="true"
+                 aria-label="<?= $e($lang('log_context_title')) ?>">
+                <div class="moloni-on__overlay-head">
+                    <h4><?= $e($lang('log_context_title')) ?></h4>
+                    <button type="button" class="moloni-on__overlay-close"
+                            data-moloni-overlay-close aria-label="<?= $e($lang('close')) ?>">&times;</button>
+                </div>
+                <pre class="moloni-on__overlay-body" data-moloni-overlay-body></pre>
+            </div>
+        </div>
     <?php endif; ?>
 </div>

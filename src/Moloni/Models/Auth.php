@@ -49,9 +49,17 @@ class Auth extends AbstractModel
 
     /**
      * Store freshly issued tokens and their expiry timestamps.
+     *
+     * The lifetimes come from the OAuth response ($accessExpiresIn /
+     * $refreshExpiresIn, in seconds); the defaults are only a fallback for
+     * responses that omit them.
      */
-    public static function setTokens(string $accessToken, string $refreshToken): void
-    {
+    public static function setTokens(
+        string $accessToken,
+        string $refreshToken,
+        int $accessExpiresIn = 3000,
+        int $refreshExpiresIn = 864000
+    ): void {
         $row = self::row();
 
         if ($row === null) {
@@ -61,9 +69,8 @@ class Auth extends AbstractModel
         self::query()->where('id', $row['id'])->update([
             'access_token' => $accessToken,
             'refresh_token' => $refreshToken,
-            // Access tokens last ~50 min; refresh tokens ~10 days.
-            'access_expire' => time() + 3000,
-            'refresh_expire' => time() + 864000,
+            'access_expire' => time() + max(0, $accessExpiresIn),
+            'refresh_expire' => time() + max(0, $refreshExpiresIn),
         ]);
     }
 
