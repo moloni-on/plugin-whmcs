@@ -95,6 +95,13 @@ return [
     'setting_product_category' => 'ID da categoria de artigo',
     'setting_exemption_reason' => 'Código de motivo de isenção',
     'setting_exemption_reason_help' => 'Código de motivo de isenção do Moloni aplicado às linhas com taxa de 0% (ex.: M07).',
+    'settings_customer_mapping' => 'Cliente e zona fiscal',
+    'setting_fiscal_zone_based_on' => 'Zona fiscal baseada em',
+    'setting_fiscal_zone_based_on_help' => 'De onde vem a zona fiscal do documento. A faturação recorre à zona da empresa quando o cliente não tem país.',
+    'fiscal_zone_company' => 'Zona fiscal da empresa',
+    'fiscal_zone_billing' => 'País de faturação do cliente',
+    'setting_vat_field' => 'Campo personalizado de NIF',
+    'setting_vat_field_help' => 'Nome do campo personalizado de cliente WHMCS com o NIF. Deixo vazio para usar o NIF do cliente.',
     'save_settings' => 'Guardar configurações',
     'settings_saved' => 'Guardei as configurações.',
 
@@ -127,7 +134,8 @@ return [
     'order_discarded' => 'Descartei a encomenda.',
     'order_reverted' => 'Repus a encomenda como pendente.',
     'document_created' => 'Criei o documento (ID :id).',
+    'document_skipped' => 'Encomenda ignorada: fatura de pagamento em massa, nada a faturar.',
     'document_failed' => 'Não consegui criar o documento: :error',
     'no_orders_selected' => 'Não selecionei nenhuma encomenda.',
-    'bulk_result' => 'Criei :created documento(s); :failed falharam.',
+    'bulk_result' => 'Criei :created documento(s); :skipped ignoradas; :failed falharam.',
 ];

@@ -7,9 +7,13 @@ namespace Moloni\Tests\Unit;
 use Moloni\Enums\TaxFiscalZoneType;
 use Moloni\Enums\TaxType;
 use Moloni\GraphQL\Mutations\CreateDocument;
+use Moloni\GraphQL\Mutations\CreatePaymentMethod;
+use Moloni\GraphQL\Mutations\UpdateCustomer;
 use Moloni\GraphQL\Mutations\UpdateDocumentStatus;
 use Moloni\GraphQL\Queries\GetCompany;
+use Moloni\GraphQL\Queries\GetCustomers;
 use Moloni\GraphQL\Queries\GetDocumentPdfToken;
+use Moloni\GraphQL\Queries\GetPaymentMethods;
 use Moloni\GraphQL\Queries\GetProducts;
 use Moloni\GraphQL\Queries\GetTaxes;
 use PHPUnit\Framework\TestCase;
@@ -92,5 +96,47 @@ final class GraphQLOperationsTest extends TestCase
         );
         // Fiscal zone code is lower-cased for the search.
         self::assertSame(['field' => 'fiscalZone', 'value' => 'pt'], $variables['options']['search']);
+    }
+
+    public function testGetCustomersSearchesByVatOrEmail(): void
+    {
+        $op = new GetCustomers();
+
+        self::assertSame(
+            ['options' => ['search' => ['field' => 'vat', 'value' => '123456789']]],
+            $op->variables(['vat' => '123456789'])
+        );
+        self::assertSame(
+            ['options' => ['search' => ['field' => 'email', 'value' => 'a@b.pt']]],
+            $op->variables(['email' => 'a@b.pt'])
+        );
+        // VAT wins when both are present; no identifier yields no filter.
+        self::assertSame('vat', $op->variables(['vat' => '1', 'email' => 'a@b.pt'])['options']['search']['field']);
+        self::assertSame([], $op->variables([]));
+    }
+
+    public function testUpdateCustomerWrapsData(): void
+    {
+        $op = new UpdateCustomer();
+
+        self::assertSame('customerUpdate', $op->operation());
+        self::assertSame(
+            ['data' => ['customerId' => 5, 'name' => 'X']],
+            $op->variables(['customerId' => 5, 'name' => 'X'])
+        );
+    }
+
+    public function testPaymentMethodOperations(): void
+    {
+        $query = new GetPaymentMethods();
+        self::assertSame('paymentMethods', $query->operation());
+        self::assertSame(
+            ['options' => ['search' => ['field' => 'name', 'value' => 'PayPal']]],
+            $query->variables(['name' => 'PayPal'])
+        );
+
+        $create = new CreatePaymentMethod();
+        self::assertSame('paymentMethodCreate', $create->operation());
+        self::assertSame(['data' => ['name' => 'PayPal']], $create->variables(['name' => 'PayPal']));
     }
 }

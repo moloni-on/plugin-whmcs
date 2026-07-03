@@ -31,20 +31,20 @@ Templates (UI)  →  moloni_on.php (output) / hooks.php
 ```
 
 - **Admin** (`src/Moloni/Admin/`): `Dispatcher` (front controller: OAuth flow + action routing + rendering), `Container` (lazy service factory)
-- **Services** (`src/Moloni/Services/`): `DocumentService`, `OrderService`, `LogService`, `SettingsService`, `AuthService`, `CountryResolver` (ISO2 → Moloni country/language), `ProductResolver` (find-by-reference or create product per line), `TaxResolver` (find/create VAT tax by the order's rate + fiscal zone)
+- **Services** (`src/Moloni/Services/`): `DocumentService` (assembles the `<Type>Insert`), `OrderService`, `LogService`, `SettingsService`, `AuthService`, `CountryResolver` (ISO2 → Moloni country/language), `CustomerResolver` (find by VAT/e-mail → create, else always update; VAT from a client custom field falling back to tax_id), `ProductResolver` (find-by-reference or create product per line), `TaxResolver` (find/create VAT tax by the order's rate + fiscal zone), `LineMapper` (WHMCS line type → reference/name/summary/discount; folds promo lines into a discount %), `PaymentResolver` (WHMCS gateway → Moloni payment method + payment line)
 - **Api** (`src/Moloni/Api/`): `ApiClient` (native-cURL HTTP: OAuth grant/refresh + GraphQL), `MoloniClient` (domain wrapper)
 - **GraphQL** (`src/Moloni/GraphQL/`): one class per query/mutation extending `AbstractOperation`; GraphQL string in the `QUERY` constant, plus `operation()` + `variables($data)`
 - **Models** (`src/Moloni/Models/`): `Order`, `Document`, `Config`, `Log`, `Auth` (extend `AbstractModel`); `Whmcs` reads native WHMCS tables
 - **Support** (`src/Moloni/Support/`): `Platform` (endpoints), `Context` (per-request session/token/company), `Company` (company payload + feature permissions via `limits`), `Lang` (i18n), `Template` (renderer)
 - **Enums** (`src/Moloni/Enums/`): `DocumentType`, `DocumentStatus`, `ProductType`, `ProductTypeAT`, `TaxType`, `TaxFiscalZoneType`
 - **Facades** (`src/Moloni/Facades/`): `LoggerFacade`
-- **Exceptions** (`src/Moloni/Exceptions/`): `MoloniException` base → `ApiException`, `DocumentException`, `AuthException`, `ValidationException`
+- **Exceptions** (`src/Moloni/Exceptions/`): `MoloniException` base → `ApiException`, `DocumentException`, `AuthException`, `ValidationException`, `SkippedException` (order intentionally not billed, e.g. mass-payment invoice)
 
 ## Database tables (custom, `mod_moloni_on_*`)
 
 Created by `src/Moloni/Database/Installer.php` on module activation.
 
-- `mod_moloni_on_config` — key-value settings (document_type, document_status, document_set_id, tax_exemption, auto_create, measurement_unit_id, product_category_id, exemption_reason). Document-line VAT is derived from each WHMCS order's tax rate via `TaxResolver`, not stored here.
+- `mod_moloni_on_config` — key-value settings (document_type, document_status, document_set_id, tax_exemption, auto_create, measurement_unit_id, product_category_id, exemption_reason, fiscal_zone_based_on [company|billing], vat_field [client custom-field name for VAT]). Document-line VAT is derived from each WHMCS order's tax rate via `TaxResolver`, not stored here.
 - `mod_moloni_on_auth` — single-row OAuth2 session (client_id, client_secret, access_token, refresh_token, expiries, company_id)
 - `mod_moloni_on_orders` — order sync tracking (order_id, moloni_document_id, status, …)
 - `mod_moloni_on_logs` — application logs (level, message, context, order_id, timestamp)

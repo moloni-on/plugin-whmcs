@@ -8,8 +8,10 @@ use Moloni\Exceptions\ApiException;
 use Moloni\GraphQL\AbstractOperation;
 use Moloni\GraphQL\Mutations\CreateCustomer;
 use Moloni\GraphQL\Mutations\CreateDocument;
+use Moloni\GraphQL\Mutations\CreatePaymentMethod;
 use Moloni\GraphQL\Mutations\CreateProduct;
 use Moloni\GraphQL\Mutations\CreateTax;
+use Moloni\GraphQL\Mutations\UpdateCustomer;
 use Moloni\GraphQL\Mutations\UpdateDocumentStatus;
 use Moloni\GraphQL\Queries\GetCompanies;
 use Moloni\GraphQL\Queries\GetCompany;
@@ -20,6 +22,7 @@ use Moloni\GraphQL\Queries\GetDocument;
 use Moloni\GraphQL\Queries\GetDocumentPdfToken;
 use Moloni\GraphQL\Queries\GetDocumentSets;
 use Moloni\GraphQL\Queries\GetMe;
+use Moloni\GraphQL\Queries\GetPaymentMethods;
 use Moloni\GraphQL\Queries\GetProducts;
 use Moloni\GraphQL\Queries\GetTaxes;
 
@@ -88,6 +91,26 @@ class MoloniClient
     }
 
     /**
+     * Find a customer by e-mail, ignoring customers that carry a VAT (those
+     * are matched by VAT instead), or null when none matches.
+     *
+     * @return array<string,mixed>|null
+     * @throws ApiException
+     */
+    public function findCustomerByEmail(string $email): ?array
+    {
+        $customers = $this->run(new GetCustomers(), ['email' => $email]);
+
+        foreach ($customers as $customer) {
+            if (empty($customer['vat'])) {
+                return $customer;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param array<string,mixed> $data CustomerInsert fields.
      * @return array<string,mixed>
      * @throws ApiException
@@ -95,6 +118,45 @@ class MoloniClient
     public function createCustomer(array $data): array
     {
         return $this->run(new CreateCustomer(), $data);
+    }
+
+    /**
+     * @param array<string,mixed> $data CustomerUpdate fields (must include customerId).
+     * @return array<string,mixed>
+     * @throws ApiException
+     */
+    public function updateCustomer(array $data): array
+    {
+        return $this->run(new UpdateCustomer(), $data);
+    }
+
+    /**
+     * Find a payment method by exact name, or null when none matches.
+     *
+     * @return array<string,mixed>|null
+     * @throws ApiException
+     */
+    public function findPaymentMethodByName(string $name): ?array
+    {
+        $methods = $this->run(new GetPaymentMethods(), ['name' => $name]);
+
+        foreach ($methods as $method) {
+            if (($method['name'] ?? null) === $name) {
+                return $method;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string,mixed> $data PaymentMethodInsert fields.
+     * @return array<string,mixed>
+     * @throws ApiException
+     */
+    public function createPaymentMethod(array $data): array
+    {
+        return $this->run(new CreatePaymentMethod(), $data);
     }
 
     /**

@@ -28,3 +28,7 @@ Thumbs.db
 
 # Local WHMCS runtime (proprietary; supplied by the developer)
 /whmcs/
+
+# Legacy reference plugins (kept locally, not tracked); brackets escaped for glob
+/\[whmcs_moloni_pt\]/
+/\[wordpress_moloni_on\]/

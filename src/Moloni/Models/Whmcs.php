@@ -67,6 +67,123 @@ class Whmcs
     }
 
     /**
+     * Domain (tbldomains) row for a domain invoice line's relid.
+     *
+     * @return object|null
+     */
+    public static function getDomainInfo(int $domainId)
+    {
+        return Capsule::table('tbldomains')->where('id', $domainId)->first();
+    }
+
+    /**
+     * Hosting service joined with its product, for a hosting line's relid.
+     *
+     * @return object|null
+     */
+    public static function getHostingInfo(int $hostingId)
+    {
+        return Capsule::table('tblhosting')
+            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+            ->where('tblhosting.id', $hostingId)
+            ->select('tblhosting.*', 'tblproducts.name')
+            ->first();
+    }
+
+    /**
+     * Hosting addon joined with its addon definition, for an addon line's relid.
+     *
+     * @return object|null
+     */
+    public static function getAddonInfo(int $addonId)
+    {
+        return Capsule::table('tblhostingaddons')
+            ->join('tbladdons', 'tblhostingaddons.addonid', '=', 'tbladdons.id')
+            ->join('tblhosting', 'tblhostingaddons.hostingid', '=', 'tblhosting.id')
+            ->where('tblhostingaddons.id', $addonId)
+            ->select('tblhostingaddons.*', 'tbladdons.name', 'tblhosting.domain', 'tblhosting.nextduedate')
+            ->first();
+    }
+
+    /**
+     * Upgrade joined with the hosting service and its product, for an
+     * upgrade line's relid.
+     *
+     * @return object|null
+     */
+    public static function getUpgradeInfo(int $upgradeId)
+    {
+        return Capsule::table('tblupgrades')
+            ->join('tblhosting', 'tblhosting.id', '=', 'tblupgrades.relid')
+            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+            ->where('tblupgrades.id', $upgradeId)
+            ->select('tblupgrades.*', 'tblproducts.name')
+            ->first();
+    }
+
+    /**
+     * Value of a named client custom field (tblcustomfields/tblcustomfieldsvalues),
+     * e.g. a VAT/NIF field. Returns null when unset or empty.
+     */
+    public static function getClientCustomFieldValue(int $userId, string $fieldName): ?string
+    {
+        if ($fieldName === '') {
+            return null;
+        }
+
+        $row = Capsule::table('tblcustomfieldsvalues')
+            ->join('tblcustomfields', 'tblcustomfields.id', '=', 'tblcustomfieldsvalues.fieldid')
+            ->where('tblcustomfields.type', 'client')
+            ->where('tblcustomfields.fieldname', $fieldName)
+            ->where('tblcustomfieldsvalues.relid', $userId)
+            ->select('tblcustomfieldsvalues.value')
+            ->first();
+
+        $value = isset($row->value) ? trim((string) $row->value) : '';
+
+        return $value !== '' ? $value : null;
+    }
+
+    /**
+     * Promotion amount applied to an invoice line, as a positive number.
+     *
+     * WHMCS records promotions as separate negative line items ("PromoDomain"
+     * or "PromoHosting") pointing at the same relid as the discounted line.
+     */
+    public static function getLineDiscountAmount(int $invoiceId, int $relId, string $promoType): float
+    {
+        $row = Capsule::table('tblinvoiceitems')
+            ->where('invoiceid', $invoiceId)
+            ->where('type', $promoType)
+            ->where('relid', $relId)
+            ->first();
+
+        $amount = isset($row->amount) ? (float) $row->amount : 0.0;
+
+        return $amount < 0 ? abs($amount) : 0.0;
+    }
+
+    /**
+     * Display name of a WHMCS payment gateway (tblpaymentgateways `name`
+     * setting), used to label the Moloni payment method. Null when unknown.
+     */
+    public static function getGatewayName(string $gateway): ?string
+    {
+        if ($gateway === '') {
+            return null;
+        }
+
+        $row = Capsule::table('tblpaymentgateways')
+            ->where('gateway', $gateway)
+            ->where('setting', 'name')
+            ->first();
+
+        $value = isset($row->value) ? trim((string) $row->value) : '';
+
+        return $value !== '' ? $value : null;
+    }
+
+    /**
      * Orders joined with their client, most recent first.
      *
      * @return array<int,object> rows with order + client_firstname/lastname/email/companyname

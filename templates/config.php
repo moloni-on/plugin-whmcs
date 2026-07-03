@@ -86,6 +86,25 @@ $current = static fn (string $key, string $default = ''): string => (string) ($s
             <small class="text-muted"><?= $e($lang('setting_exemption_reason_help')) ?></small>
         </div>
 
+        <hr>
+        <h5><?= $e($lang('settings_customer_mapping')) ?></h5>
+
+        <div class="form-group mb-3">
+            <label for="fiscal_zone_based_on"><?= $e($lang('setting_fiscal_zone_based_on')) ?></label>
+            <select class="form-control" id="fiscal_zone_based_on" name="fiscal_zone_based_on">
+                <option value="company"<?= $current('fiscal_zone_based_on', 'company') === 'company' ? ' selected' : '' ?>><?= $e($lang('fiscal_zone_company')) ?></option>
+                <option value="billing"<?= $current('fiscal_zone_based_on') === 'billing' ? ' selected' : '' ?>><?= $e($lang('fiscal_zone_billing')) ?></option>
+            </select>
+            <small class="text-muted"><?= $e($lang('setting_fiscal_zone_based_on_help')) ?></small>
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="vat_field"><?= $e($lang('setting_vat_field')) ?></label>
+            <input type="text" class="form-control" id="vat_field" name="vat_field"
+                   value="<?= $e($current('vat_field', '')) ?>">
+            <small class="text-muted"><?= $e($lang('setting_vat_field_help')) ?></small>
+        </div>
+
         <button type="submit" class="btn btn-primary"><?= $e($lang('save_settings')) ?></button>
     </form>
 </div>

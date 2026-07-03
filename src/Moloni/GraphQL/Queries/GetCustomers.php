@@ -7,8 +7,8 @@ namespace Moloni\GraphQL\Queries;
 use Moloni\GraphQL\AbstractOperation;
 
 /**
- * Searches customers, typically filtered by VAT to detect an existing client
- * before creating a new one.
+ * Searches customers by VAT or e-mail to detect an existing client before
+ * creating a new one.
  */
 class GetCustomers extends AbstractOperation
 {
@@ -33,22 +33,26 @@ class GetCustomers extends AbstractOperation
     GRAPHQL;
 
     /**
+     * Accepts a single {field, value} search pair (e.g. vat or email).
+     *
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
     public function variables(array $data = []): array
     {
-        $variables = [];
-
-        if (!empty($data['vat'])) {
-            $variables['options'] = [
-                'search' => [
-                    'field' => 'vat',
-                    'value' => (string) $data['vat'],
-                ],
-            ];
+        foreach (['vat', 'email'] as $field) {
+            if (!empty($data[$field])) {
+                return [
+                    'options' => [
+                        'search' => [
+                            'field' => $field,
+                            'value' => (string) $data[$field],
+                        ],
+                    ],
+                ];
+            }
         }
 
-        return $variables;
+        return [];
     }
 }

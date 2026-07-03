@@ -93,6 +93,13 @@ return [
     'setting_product_category' => 'Product category ID',
     'setting_exemption_reason' => 'Tax exemption reason code',
     'setting_exemption_reason_help' => 'Moloni exemption reason code applied to lines with a 0% tax rate (e.g. M07).',
+    'settings_customer_mapping' => 'Customer & fiscal zone',
+    'setting_fiscal_zone_based_on' => 'Fiscal zone based on',
+    'setting_fiscal_zone_based_on_help' => 'Where the document fiscal zone comes from. Billing falls back to the company zone when the client has no country.',
+    'fiscal_zone_company' => 'Company fiscal zone',
+    'fiscal_zone_billing' => 'Client billing country',
+    'setting_vat_field' => 'VAT custom field',
+    'setting_vat_field_help' => 'Name of the WHMCS client custom field holding the VAT number. Leave empty to use the client Tax ID.',
     'save_settings' => 'Save settings',
     'settings_saved' => 'Settings saved.',
 
@@ -125,7 +132,8 @@ return [
     'order_discarded' => 'Order discarded.',
     'order_reverted' => 'Order moved back to pending.',
     'document_created' => 'Document created (ID :id).',
+    'document_skipped' => 'Order skipped: mass-payment invoice, nothing to bill.',
     'document_failed' => 'Document creation failed: :error',
     'no_orders_selected' => 'No orders were selected.',
-    'bulk_result' => ':created document(s) created, :failed failed.',
+    'bulk_result' => ':created document(s) created, :skipped skipped, :failed failed.',
 ];

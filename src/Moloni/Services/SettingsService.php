@@ -21,6 +21,13 @@ class SettingsService
     public const MEASUREMENT_UNIT_ID = 'measurement_unit_id';
     public const PRODUCT_CATEGORY_ID = 'product_category_id';
     public const EXEMPTION_REASON = 'exemption_reason';
+    public const FISCAL_ZONE_BASED_ON = 'fiscal_zone_based_on';
+    public const VAT_FIELD = 'vat_field';
+
+    /** Document fiscal zone follows the Moloni company's own zone. */
+    public const FISCAL_ZONE_COMPANY = 'company';
+    /** Document fiscal zone follows the client's billing country. */
+    public const FISCAL_ZONE_BILLING = 'billing';
 
     public function get(string $key, ?string $default = null): ?string
     {
@@ -83,5 +90,25 @@ class SettingsService
     public function exemptionReason(): string
     {
         return (string) $this->get(self::EXEMPTION_REASON, '');
+    }
+
+    /**
+     * Where a document's fiscal zone is taken from: the Moloni company's own
+     * zone (default) or the client's billing country.
+     */
+    public function fiscalZoneBasedOn(): string
+    {
+        $value = (string) $this->get(self::FISCAL_ZONE_BASED_ON, self::FISCAL_ZONE_COMPANY);
+
+        return $value === self::FISCAL_ZONE_BILLING ? self::FISCAL_ZONE_BILLING : self::FISCAL_ZONE_COMPANY;
+    }
+
+    /**
+     * Name of the WHMCS client custom field holding the VAT/tax number. When
+     * empty (or the client has no value), the native tblclients.tax_id is used.
+     */
+    public function vatField(): string
+    {
+        return trim((string) $this->get(self::VAT_FIELD, ''));
     }
 }

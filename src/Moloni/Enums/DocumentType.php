@@ -40,6 +40,21 @@ final class DocumentType
         return in_array($type, self::all(), true);
     }
 
+    /**
+     * Document types that carry payment entries. A plain invoice does not — its
+     * payment is registered separately via a receipt — so payments are only
+     * added to receipts, invoice-receipts and pro-forma/simplified invoices.
+     */
+    public static function hasPayments(string $type): bool
+    {
+        return in_array($type, [
+            self::RECEIPT,
+            self::INVOICE_RECEIPT,
+            self::PRO_FORMA_INVOICE,
+            self::SIMPLIFIED_INVOICE,
+        ], true);
+    }
+
     private function __construct()
     {
     }

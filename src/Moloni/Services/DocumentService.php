@@ -10,6 +10,7 @@ use Moloni\Enums\DocumentType;
 use Moloni\Exceptions\ApiException;
 use Moloni\Exceptions\DocumentException;
 use Moloni\Exceptions\MoloniException;
+use Moloni\Exceptions\SkippedException;
 use Moloni\Exceptions\ValidationException;
 use Moloni\Facades\LoggerFacade;
 use Moloni\Models\Document;
@@ -22,9 +23,10 @@ use Throwable;
 /**
  * Turns WHMCS orders into Moloni ON documents and manages created documents.
  *
- * The WHMCS order -> Moloni <Type>Insert mapping lives here. Customer, country
- * and product resolution are delegated to {@see CountryResolver} and
- * {@see ProductResolver} so those concerns can be refined independently.
+ * The WHMCS order -> Moloni <Type>Insert assembly lives here; the individual
+ * concerns are delegated so each can be refined independently:
+ * {@see CustomerResolver} (customer), {@see LineMapper} + {@see ProductResolver}
+ * + {@see TaxResolver} (product lines) and {@see PaymentResolver} (payments).
  */
 class DocumentService
 {
@@ -34,17 +36,26 @@ class DocumentService
 
     private CountryResolver $countries;
 
+    private CustomerResolver $customers;
+
     private ProductResolver $products;
 
     private TaxResolver $taxes;
+
+    private LineMapper $lines;
+
+    private PaymentResolver $paymentResolver;
 
     public function __construct(MoloniClient $client, SettingsService $settings)
     {
         $this->client = $client;
         $this->settings = $settings;
         $this->countries = new CountryResolver($client);
+        $this->customers = new CustomerResolver($client, $settings, $this->countries);
         $this->products = new ProductResolver($client, $settings);
         $this->taxes = new TaxResolver($client);
+        $this->lines = new LineMapper();
+        $this->paymentResolver = new PaymentResolver($client);
     }
 
     /**
@@ -68,27 +79,55 @@ class DocumentService
         }
 
         try {
-            $client = $order->userid ? Whmcs::getClient((int) $order->userid) : null;
-            $customerId = $this->resolveCustomerId($client);
-
             $invoice = $order->invoiceid ? Whmcs::getInvoice((int) $order->invoiceid) : null;
             $items = $order->invoiceid ? Whmcs::getInvoiceItems((int) $order->invoiceid) : [];
-            $fiscalZone = $this->fiscalZone();
 
+            // A WHMCS mass-payment invoice only bundles other invoices together;
+            // those are billed on their own, so there is nothing to invoice here.
+            if ($this->isMassPayment($items)) {
+                Order::setStatus($orderId, Order::STATUS_DISCARDED);
+                LoggerFacade::info(
+                    'Order skipped: mass-payment invoice that only aggregates other invoices.',
+                    ['order_id' => $orderId],
+                    $orderId
+                );
+
+                throw new SkippedException('Mass-payment invoice; no document created.', ['order_id' => $orderId]);
+            }
+
+            $client = $order->userid ? Whmcs::getClient((int) $order->userid) : null;
+            $customerId = $this->customers->resolve($client);
+
+            $fiscalZone = $this->resolveFiscalZone($client);
+            $reference = '#' . ($order->ordernum ?: $order->id);
+            $now = date('Y-m-d H:i:s');
             $wantedStatus = $this->settings->documentStatus();
 
             $payload = [
                 'customerId' => $customerId,
                 'documentSetId' => $this->settings->documentSetId(),
                 'fiscalZone' => $fiscalZone['code'],
-                'date' => date('Y-m-d H:i:s'),
+                'date' => $now,
+                'expirationDate' => $now,
                 // Always create as draft; the document is only closed afterwards
                 // once we've confirmed Moloni's total matches the order total.
                 'status' => DocumentStatus::DRAFT,
-                'ourReference' => '#' . ($order->ordernum ?: $order->id),
-                'yourReference' => '#' . ($order->ordernum ?: $order->id),
-                'products' => $this->resolveProductLines($items, (float) $order->amount, $invoice, $fiscalZone),
+                'ourReference' => $reference,
+                'yourReference' => $reference,
+                'products' => $this->resolveProductLines(
+                    $items,
+                    (float) $order->amount,
+                    $invoice,
+                    $fiscalZone,
+                    (int) $order->invoiceid
+                ),
             ];
+
+            $payments = $this->resolvePayments($order, $documentType);
+
+            if ($payments !== []) {
+                $payload['payments'] = $payments;
+            }
 
             $result = $this->client->createDocument($payload, $documentType);
             $documentId = (int) ($result['documentId'] ?? 0);
@@ -117,6 +156,10 @@ class DocumentService
             ], $orderId);
 
             return $documentId;
+        } catch (SkippedException $e) {
+            // Not a failure: the order was intentionally skipped (and already
+            // marked discarded + logged above). Let it propagate as-is.
+            throw $e;
         } catch (Throwable $e) {
             // Any failure (API, validation, resolver, DB) must mark the order
             // failed and be logged with context — never a silent partial abort.
@@ -137,11 +180,12 @@ class DocumentService
      * Create documents for many orders, continuing past individual failures.
      *
      * @param array<int,int> $orderIds
-     * @return array{created:array<int,int>,failed:array<int,array{order_id:int,error:string}>}
+     * @return array{created:array<int,int>,skipped:array<int,int>,failed:array<int,array{order_id:int,error:string}>}
      */
     public function bulkCreateDocuments(array $orderIds, ?string $documentType = null): array
     {
         $created = [];
+        $skipped = [];
         $failed = [];
 
         foreach ($orderIds as $orderId) {
@@ -149,6 +193,9 @@ class DocumentService
 
             try {
                 $created[] = $this->createDocumentFromOrder($orderId, $documentType);
+            } catch (SkippedException $e) {
+                // Intentionally not billed (e.g. mass-payment invoice).
+                $skipped[] = $orderId;
             } catch (Throwable $e) {
                 $failed[] = ['order_id' => $orderId, 'error' => $e->getMessage()];
             }
@@ -156,10 +203,11 @@ class DocumentService
 
         LoggerFacade::info('Bulk document creation finished.', [
             'created' => count($created),
+            'skipped' => count($skipped),
             'failed' => count($failed),
         ]);
 
-        return ['created' => $created, 'failed' => $failed];
+        return ['created' => $created, 'skipped' => $skipped, 'failed' => $failed];
     }
 
     /**
@@ -211,58 +259,31 @@ class DocumentService
     }
 
     /**
-     * Resolve (find or create) the Moloni customer for a WHMCS client.
+     * Whether an invoice is a WHMCS mass payment: it carries at least one
+     * "Invoice" line (each referencing another invoice being paid) and no
+     * billable product line of its own. Such an invoice must not be turned
+     * into a Moloni document — the aggregated invoices are billed separately.
      *
-     * @param object|null $client tblclients row
-     * @throws ApiException
+     * @param array<int,object> $items tblinvoiceitems rows
      */
-    private function resolveCustomerId($client): int
+    private function isMassPayment(array $items): bool
     {
-        if ($client === null) {
-            throw new DocumentException('Order has no associated WHMCS client.');
+        if ($items === []) {
+            return false;
         }
 
-        $vat = trim((string) ($client->tax_id ?? ''));
+        $hasMassPay = false;
 
-        if ($vat !== '') {
-            $existing = $this->client->findCustomerByVat($vat);
-
-            if ($existing !== null && !empty($existing['customerId'])) {
-                return (int) $existing['customerId'];
+        foreach ($items as $item) {
+            if ((string) ($item->type ?? '') === 'Invoice') {
+                $hasMassPay = true;
+            } else {
+                // A real, billable line: this is a normal invoice.
+                return false;
             }
         }
 
-        $country = $this->countries->resolve((string) ($client->country ?? ''));
-        $name = trim((string) ($client->companyname ?: ($client->firstname . ' ' . $client->lastname)));
-
-        $data = [
-            'name' => $name !== '' ? $name : 'Customer',
-            'email' => (string) ($client->email ?? ''),
-            'vat' => $vat !== '' ? $vat : null,
-            'address' => (string) ($client->address1 ?? ''),
-            'city' => (string) ($client->city ?? ''),
-            'zipCode' => (string) ($client->postcode ?? ''),
-            'phone' => (string) ($client->phonenumber ?? ''),
-            'contactName' => $name,
-            'number' => $this->client->getCustomerNextNumber() ?? '',
-        ];
-
-        if ($country['countryId'] !== null) {
-            $data['countryId'] = $country['countryId'];
-        }
-
-        if ($country['languageId'] !== null) {
-            $data['languageId'] = $country['languageId'];
-        }
-
-        $created = $this->client->createCustomer($data);
-        $customerId = (int) ($created['customerId'] ?? 0);
-
-        if ($customerId <= 0) {
-            throw new ApiException('Moloni ON did not return a customer id.', ['response' => $created]);
-        }
-
-        return $customerId;
+        return $hasMassPay;
     }
 
     /**
@@ -279,8 +300,13 @@ class DocumentService
      * @return array<int,array<string,mixed>>
      * @throws ApiException
      */
-    private function resolveProductLines(array $items, float $orderTotal, $invoice, array $fiscalZone): array
-    {
+    private function resolveProductLines(
+        array $items,
+        float $orderTotal,
+        $invoice,
+        array $fiscalZone,
+        int $invoiceId
+    ): array {
         $rates = $this->invoiceTaxRates($invoice);
 
         if ($items === []) {
@@ -296,12 +322,31 @@ class DocumentService
         $ordering = 1;
 
         foreach ($items as $item) {
-            $name = (string) ($item->description ?? 'Item');
+            // Derive a stable reference, name, summary and discount from the
+            // WHMCS line type; promotion lines are folded into the discounted
+            // line and skipped here.
+            $meta = $this->lines->map($item, $invoiceId);
+
+            if ($meta['skip']) {
+                continue;
+            }
+
+            $name = $meta['name'] !== '' ? $meta['name'] : (string) ($item->description ?? 'Item');
+            $reference = $meta['reference'] !== '' ? $meta['reference'] : null;
             $price = (float) ($item->amount ?? 0);
             // Only taxed lines get VAT; untaxed lines are exempt.
             $lineRates = ((int) ($item->taxed ?? 0)) === 1 ? $rates : [];
 
-            $lines[] = $this->buildLine($name, $price, $lineRates, $fiscalZone, $ordering++);
+            $lines[] = $this->buildLine(
+                $name,
+                $price,
+                $lineRates,
+                $fiscalZone,
+                $ordering++,
+                $reference,
+                $meta['summary'],
+                $meta['discount']
+            );
         }
 
         return $lines;
@@ -321,7 +366,9 @@ class DocumentService
         array $rates,
         array $fiscalZone,
         int $ordering,
-        ?string $reference = null
+        ?string $reference = null,
+        string $summary = '',
+        float $discount = 0.0
     ): array {
         $lineTaxes = [];
         $order = 1;
@@ -348,13 +395,31 @@ class DocumentService
         return [
             'productId' => $this->products->resolveId($name, $price, $lineTaxes, $exemptionReason, $reference),
             'name' => $name,
+            'summary' => $summary,
             'qty' => 1,
             'price' => $price,
-            'discount' => 0,
+            'discount' => round($discount, 2),
             'ordering' => $ordering,
             'taxes' => $lineTaxes,
             'exemptionReason' => $exemptionReason,
         ];
+    }
+
+    /**
+     * Payment entries for the order, or [] when the document type carries none
+     * or the gateway cannot be resolved.
+     *
+     * @param object $order tblorders row
+     * @return array<int,array<string,mixed>>
+     * @throws ApiException
+     */
+    private function resolvePayments($order, string $documentType): array
+    {
+        if (!DocumentType::hasPayments($documentType)) {
+            return [];
+        }
+
+        return $this->paymentResolver->resolve($order);
     }
 
     /**
@@ -403,11 +468,44 @@ class DocumentService
     }
 
     /**
+     * The document fiscal zone (code + countryId), honouring the
+     * "fiscal zone based on" setting. When set to the client's billing country,
+     * the zone follows that country; it falls back to the company zone whenever
+     * the client has no usable country.
+     *
+     * @param object|null $client tblclients row
+     * @return array{code:string,countryId:int}
+     */
+    private function resolveFiscalZone($client): array
+    {
+        $company = $this->companyFiscalZone();
+
+        if ($this->settings->fiscalZoneBasedOn() !== SettingsService::FISCAL_ZONE_BILLING) {
+            return $company;
+        }
+
+        $iso2 = strtoupper(trim((string) ($client->country ?? '')));
+
+        if ($iso2 === '') {
+            return $company;
+        }
+
+        // The fiscal zone code is the ISO-3166-1 alpha-2 country code; the
+        // matching Moloni countryId comes from the country resolver.
+        $country = $this->countries->resolve($iso2);
+
+        return [
+            'code' => $iso2,
+            'countryId' => $country['countryId'] ?? $company['countryId'],
+        ];
+    }
+
+    /**
      * The active company's fiscal zone (code + countryId) from the Context.
      *
      * @return array{code:string,countryId:int}
      */
-    private function fiscalZone(): array
+    private function companyFiscalZone(): array
     {
         $company = Context::company();
         $fiscalZone = $company !== null ? $company->get('fiscalZone') : null;

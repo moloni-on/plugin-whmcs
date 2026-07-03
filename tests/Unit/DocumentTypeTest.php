@@ -29,4 +29,20 @@ final class DocumentTypeTest extends TestCase
         self::assertContains(DocumentType::RECEIPT, $all);
         self::assertSame($all, array_values(array_unique($all)));
     }
+
+    public function testHasPaymentsOnlyForPaymentCarryingTypes(): void
+    {
+        self::assertTrue(DocumentType::hasPayments(DocumentType::RECEIPT));
+        self::assertTrue(DocumentType::hasPayments(DocumentType::INVOICE_RECEIPT));
+        self::assertTrue(DocumentType::hasPayments(DocumentType::SIMPLIFIED_INVOICE));
+        self::assertTrue(DocumentType::hasPayments(DocumentType::PRO_FORMA_INVOICE));
+    }
+
+    public function testHasPaymentsFalseForPlainInvoiceAndOthers(): void
+    {
+        // A plain invoice's payment is registered separately via a receipt.
+        self::assertFalse(DocumentType::hasPayments(DocumentType::INVOICE));
+        self::assertFalse(DocumentType::hasPayments(DocumentType::ESTIMATE));
+        self::assertFalse(DocumentType::hasPayments(''));
+    }
 }

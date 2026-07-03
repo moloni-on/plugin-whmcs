@@ -8,6 +8,7 @@ use Moloni\Enums\DocumentType;
 use Moloni\Exceptions\AuthException;
 use Moloni\Exceptions\DocumentException;
 use Moloni\Exceptions\MoloniException;
+use Moloni\Exceptions\SkippedException;
 use Moloni\Facades\LoggerFacade;
 use Moloni\Models\Order;
 use Moloni\Services\LogService;
@@ -163,6 +164,8 @@ class Dispatcher
         try {
             $documentId = $this->container->documents()->createDocumentFromOrder($orderId, $documentType ?: null);
             $this->success(Lang::get('document_created', ['id' => $documentId]));
+        } catch (SkippedException $e) {
+            $this->success(Lang::get('document_skipped'));
         } catch (DocumentException $e) {
             $this->error(Lang::get('document_failed', ['error' => $e->getMessage()]));
         }
@@ -183,6 +186,7 @@ class Dispatcher
 
         $this->success(Lang::get('bulk_result', [
             'created' => count($result['created']),
+            'skipped' => count($result['skipped']),
             'failed' => count($result['failed']),
         ]));
     }
@@ -214,6 +218,14 @@ class Dispatcher
 
         if (isset($_POST[$settings::EXEMPTION_REASON])) {
             $settings->set($settings::EXEMPTION_REASON, trim((string) $_POST[$settings::EXEMPTION_REASON]));
+        }
+
+        if (isset($_POST[$settings::FISCAL_ZONE_BASED_ON])) {
+            $settings->set($settings::FISCAL_ZONE_BASED_ON, (string) $_POST[$settings::FISCAL_ZONE_BASED_ON]);
+        }
+
+        if (isset($_POST[$settings::VAT_FIELD])) {
+            $settings->set($settings::VAT_FIELD, trim((string) $_POST[$settings::VAT_FIELD]));
         }
 
         LoggerFacade::info('Settings saved.');
