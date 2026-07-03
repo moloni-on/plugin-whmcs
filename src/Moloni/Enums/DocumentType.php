@@ -10,7 +10,6 @@ namespace Moloni\Enums;
 final class DocumentType
 {
     public const INVOICE = 'invoice';
-    public const RECEIPT = 'receipt';
     public const INVOICE_RECEIPT = 'invoiceReceipt';
     public const SIMPLIFIED_INVOICE = 'simplifiedInvoice';
     public const PRO_FORMA_INVOICE = 'proFormaInvoice';
@@ -18,8 +17,7 @@ final class DocumentType
     public const ESTIMATE = 'estimate';
 
     /**
-     * Document types the module offers as billing targets. Receipts are
-     * intentionally excluded — they are not used to invoice an order.
+     * Document types the module offers as billing targets.
      *
      * @return array<int,string>
      */
@@ -43,12 +41,11 @@ final class DocumentType
     /**
      * Document types that carry payment entries. A plain invoice does not — its
      * payment is registered separately via a receipt — so payments are only
-     * added to receipts, invoice-receipts and pro-forma/simplified invoices.
+     * added to invoice-receipts and pro-forma/simplified invoices.
      */
     public static function hasPayments(string $type): bool
     {
         return in_array($type, [
-            self::RECEIPT,
             self::INVOICE_RECEIPT,
             self::PRO_FORMA_INVOICE,
             self::SIMPLIFIED_INVOICE,

@@ -16,6 +16,9 @@ use Moloni\GraphQL\AbstractOperation;
  */
 class CreateDocumentPdf extends AbstractOperation
 {
+    // Unlike the other operations (which hold a static GraphQL string in a QUERY
+    // constant), the operation name here is derived from the document type at
+    // construction, so the query is built into instance state instead.
     private string $operationName;
 
     private string $query;

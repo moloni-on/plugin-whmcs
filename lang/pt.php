@@ -73,7 +73,6 @@ return [
 
     // Tipos de documento
     'doctype_invoice' => 'Fatura',
-    'doctype_receipt' => 'Recibo',
     'doctype_invoiceReceipt' => 'Fatura-Recibo',
     'doctype_simplifiedInvoice' => 'Fatura Simplificada',
     'doctype_proFormaInvoice' => 'Fatura Pró-forma',
@@ -82,6 +81,10 @@ return [
 
     // Configurações
     'settings_title' => 'As tuas configurações',
+    'settings_document_defaults' => 'Predefinições do documento',
+    'settings_document_defaults_help' => 'Que tipo de documento criar no Moloni ON e como é emitido.',
+    'settings_automation' => 'Automação',
+    'settings_automation_help' => 'Quando os documentos são criados automaticamente e o que acontece depois.',
     'setting_document_type' => 'Tipo de documento predefinido',
     'setting_document_status' => 'Estado do documento',
     'status_draft' => 'Rascunho',
@@ -99,9 +102,11 @@ return [
     'settings_product_mapping_help' => 'Predefinições usadas ao criar artigos no Moloni ON para as linhas da encomenda. Os impostos são obtidos automaticamente da taxa de IVA de cada encomenda.',
     'setting_measurement_unit' => 'Unidade de medida',
     'setting_product_category' => 'Categoria de artigo',
+    'setting_custom_reference' => 'Campo personalizado da referência do artigo',
+    'setting_custom_reference_help' => 'Campo personalizado de produto do WHMCS cuja descrição contém a referência Moloni de um produto de alojamento. Deixa em Nenhum para usar a referência predefinida.',
     'setting_exemption_reason' => 'Motivo de isenção de imposto',
     'setting_exemption_reason_help' => 'Motivo de isenção aplicado automaticamente a qualquer linha sem IVA (ex.: M07). Aparece como lista quando a tua zona fiscal define códigos de motivo; caso contrário, é introduzido como texto livre.',
-    'settings_customer_mapping' => 'Cliente e zona fiscal',
+    'settings_customer_mapping' => 'Impostos e zona fiscal',
     'setting_fiscal_zone_based_on' => 'Zona fiscal baseada em',
     'setting_fiscal_zone_based_on_help' => 'De onde vem a zona fiscal do documento. A faturação recorre à zona da empresa quando o cliente não tem país.',
     'fiscal_zone_company' => 'Zona fiscal da empresa',

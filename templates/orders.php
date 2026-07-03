@@ -16,6 +16,7 @@
  * @var array<int,object> $orders
  * @var \Moloni\Support\Paginator $ordersPagination
  * @var array<int,string> $documentTypes
+ * @var string|null $selectedDocumentType
  */
 ?>
 <div class="moloni-on__panel">
@@ -29,7 +30,7 @@
             <input type="hidden" name="op" value="bulkCreate">
             <select name="document_type" class="form-control moloni-on__doc-type">
                 <?php foreach ($documentTypes as $type) : ?>
-                    <option value="<?= $e($type) ?>"><?= $e($lang('doctype_' . $type)) ?></option>
+                    <option value="<?= $e($type) ?>"<?= ($selectedDocumentType ?? null) === $type ? ' selected' : '' ?>><?= $e($lang('doctype_' . $type)) ?></option>
                 <?php endforeach; ?>
             </select>
             <button type="submit" class="btn btn-primary" data-moloni-confirm="<?= $e($lang('confirm_bulk')) ?>">

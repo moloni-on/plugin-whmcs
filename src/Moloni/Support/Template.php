@@ -47,8 +47,9 @@ final class Template
         // page is already served from.
         $orderUrl = static fn (int $orderId): string => 'orders.php?action=view&id=' . $orderId;
         // Format an amount with a row's client currency (prefix/suffix, code as
-        // fallback). $row is any object carrying currency_prefix/suffix/code.
-        $money = static function (float $amount, $row = null): string {
+        // fallback). $row is any object carrying currency_prefix / currency_suffix
+        // / currency_code; missing fields degrade to the bare formatted number.
+        $money = static function (float $amount, object $row): string {
             $formatted = number_format($amount, 2);
             $prefix = trim((string) ($row->currency_prefix ?? ''));
             $suffix = trim((string) ($row->currency_suffix ?? ''));

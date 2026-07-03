@@ -19,6 +19,7 @@ use Moloni\GraphQL\Mutations\UpdateDocumentStatus;
 use Moloni\GraphQL\Queries\GetCompanies;
 use Moloni\GraphQL\Queries\GetCompany;
 use Moloni\GraphQL\Queries\GetCountries;
+use Moloni\GraphQL\Queries\GetCurrencyExchanges;
 use Moloni\GraphQL\Queries\GetCustomerNextNumber;
 use Moloni\GraphQL\Queries\GetCustomers;
 use Moloni\GraphQL\Queries\GetDocument;
@@ -206,6 +207,29 @@ class MoloniClient
     public function getCountries(): array
     {
         return $this->run(new GetCountries());
+    }
+
+    /**
+     * Find the currency exchange from one ISO-4217 currency to another, or null
+     * when Moloni ON has no exchange for that pair.
+     *
+     * @return array<string,mixed>|null
+     * @throws ApiException
+     */
+    public function findCurrencyExchange(string $from, string $to): ?array
+    {
+        $exchanges = $this->run(new GetCurrencyExchanges(), ['from' => $from, 'to' => $to]);
+
+        foreach ($exchanges as $exchange) {
+            $matchesFrom = strtoupper((string) ($exchange['from']['iso4217'] ?? '')) === strtoupper($from);
+            $matchesTo = strtoupper((string) ($exchange['to']['iso4217'] ?? '')) === strtoupper($to);
+
+            if ($matchesFrom && $matchesTo) {
+                return $exchange;
+            }
+        }
+
+        return null;
     }
 
     /**

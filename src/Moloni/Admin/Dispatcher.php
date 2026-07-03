@@ -11,7 +11,9 @@ use Moloni\Exceptions\MoloniException;
 use Moloni\Exceptions\SkippedException;
 use Moloni\Facades\LoggerFacade;
 use Moloni\Models\Order;
+use Moloni\Models\Whmcs;
 use Moloni\Services\LogService;
+use Moloni\Services\SettingsService;
 use Moloni\Support\Company;
 use Moloni\Support\Context;
 use Moloni\Support\Lang;
@@ -286,6 +288,10 @@ class Dispatcher
             $settings->set($settings::VAT_FIELD, trim($this->request->post($settings::VAT_FIELD)));
         }
 
+        if ($this->request->hasPost($settings::CUSTOM_REFERENCE)) {
+            $settings->set($settings::CUSTOM_REFERENCE, trim($this->request->post($settings::CUSTOM_REFERENCE)));
+        }
+
         LoggerFacade::info('Settings saved.');
         $this->success(Lang::get('settings_saved'));
     }
@@ -454,6 +460,9 @@ class Dispatcher
                     'orders' => $orders->items(),
                     'ordersPagination' => $orders,
                     'documentTypes' => DocumentType::all(),
+                    'selectedDocumentType' => $this->container->settings()->get(
+                        SettingsService::DOCUMENT_TYPE
+                    ),
                 ];
 
             case 'documents':
@@ -522,6 +531,7 @@ class Dispatcher
             'productCategories' => $this->safeList('product categories', [$client, 'getProductCategories']),
             'paymentMethods' => $this->safeList('payment methods', [$client, 'getPaymentMethods']),
             'exemptionReasons' => $company ? $company->getExemptionReasons() : [],
+            'productCustomFields' => Whmcs::productCustomFieldNames(),
         ];
     }
 

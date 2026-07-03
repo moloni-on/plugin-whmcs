@@ -22,6 +22,16 @@ class LineMapper
     private const PROMO_DOMAIN = 'PromoDomain';
     private const PROMO_HOSTING = 'PromoHosting';
 
+    /** Default reference for a hosting line when no custom reference applies. */
+    private const HOSTING_REFERENCE = 'Alojamento';
+
+    private SettingsService $settings;
+
+    public function __construct(SettingsService $settings)
+    {
+        $this->settings = $settings;
+    }
+
     /**
      * @param object $item tblinvoiceitems row (type, relid, description, amount, duedate)
      * @return array{name:string,reference:string,summary:string,discount:float,skip:bool}
@@ -133,13 +143,36 @@ class LineMapper
         }
 
         $discount = $this->discount($item, $invoiceId, $relId, self::PROMO_HOSTING);
+        $reference = $this->hostingReference($hosting);
 
         return $this->line(
             $name !== '' ? $name : (string) ($item->description ?? ''),
-            'Alojamento',
+            $reference,
             $summary,
             $discount
         );
+    }
+
+    /**
+     * A hosting line's reference: the product custom-field description named by
+     * the `custom_reference` setting, falling back to the default reference.
+     *
+     * @param object|null $hosting tblhosting row (carries packageid)
+     */
+    private function hostingReference($hosting): string
+    {
+        $fieldName = $this->settings->customReference();
+        $packageId = (int) ($hosting->packageid ?? 0);
+
+        if ($fieldName !== '' && $packageId > 0) {
+            $custom = Whmcs::productCustomFieldDescription($packageId, $fieldName);
+
+            if ($custom !== null) {
+                return $custom;
+            }
+        }
+
+        return self::HOSTING_REFERENCE;
     }
 
     /**

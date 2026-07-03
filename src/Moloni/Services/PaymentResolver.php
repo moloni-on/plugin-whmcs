@@ -7,6 +7,7 @@ namespace Moloni\Services;
 use Moloni\Api\MoloniClient;
 use Moloni\Exceptions\ApiException;
 use Moloni\Models\Whmcs;
+use Moloni\Support\CurrencyExchange;
 
 /**
  * Builds a document's payment line from a WHMCS order's payment gateway.
@@ -30,10 +31,12 @@ class PaymentResolver
 
     /**
      * @param object $order tblorders row
+     * @param CurrencyExchange|null $exchange Applied to the payment value when the
+     *        order currency differs from the company base currency.
      * @return array<int,array<string,mixed>> Zero or one payment entry.
      * @throws ApiException
      */
-    public function resolve($order): array
+    public function resolve($order, ?CurrencyExchange $exchange = null): array
     {
         $name = Whmcs::getGatewayName((string) ($order->paymentmethod ?? ''));
 
@@ -47,11 +50,15 @@ class PaymentResolver
             return [];
         }
 
+        // The order total is in the client currency; convert to the company base
+        // currency when an exchange applies.
+        $value = (float) ($order->amount ?? 0);
+
         return [[
             'paymentMethodId' => $paymentMethodId,
             'paymentMethodName' => $name,
             'date' => date('Y-m-d H:i:s'),
-            'value' => (float) ($order->amount ?? 0),
+            'value' => $exchange !== null ? $exchange->toBase($value) : $value,
         ]];
     }
 

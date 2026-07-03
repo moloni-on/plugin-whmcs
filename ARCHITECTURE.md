@@ -68,7 +68,7 @@
 **Pages:**
 - `login.php` - API key authentication
 - `company.php` - Company selection
-- `orders.php` - Orders pending sync
+- `orders.php` - Orders pending sync (only orders whose WHMCS invoice is `Paid`)
 - `documents.php` - Created documents list
 - `discarded.php` - Orders marked "do not sync"
 - `config.php` - Settings management
@@ -183,7 +183,7 @@ class DocumentService {
 ```php
 class OrderService {
     public function getPendingOrders() {
-        // Return WHMCS orders not yet synced
+        // Return WHMCS orders with a Paid invoice, not yet synced/discarded
     }
     
     public function getCreatedDocuments() {
@@ -442,10 +442,13 @@ try {
    → Calls DocumentService->createDocumentFromOrder()
    ↓
 4. DocumentService
-   → Fetches WHMCS order (via Order Model)
+   → Fetches WHMCS order (via Order Model); refuses orders with no invoice items
    → Checks if customer exists in Moloni ON
    → If not, creates customer via MoloniClient->createCustomer()
-   → Maps WHMCS order items to Moloni ON format
+   → Resolves the currency exchange (CurrencyResolver) when the client currency
+     differs from the company base currency
+   → Maps WHMCS order items to Moloni ON format, converting amounts to the base
+     currency and stamping currencyExchangeId/currencyExchangeExchange
    → Calls MoloniClient->createDocument()
    → Updates mod_moloni_on_orders table
    → Persists created document to mod_moloni_on_documents table

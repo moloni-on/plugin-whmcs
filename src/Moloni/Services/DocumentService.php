@@ -17,6 +17,7 @@ use Moloni\Models\Document;
 use Moloni\Models\Order;
 use Moloni\Models\Whmcs;
 use Moloni\Support\Context;
+use Moloni\Support\CurrencyExchange;
 use Moloni\Support\FiscalZone;
 use Moloni\Support\LineInput;
 use Moloni\Support\Platform;
@@ -35,12 +36,14 @@ class DocumentService
     /** Largest difference (in currency units) still treated as an exact total match. */
     private const MONETARY_EPSILON = 0.01;
 
-    /** Synthetic line used when an order has no invoice items to map. */
-    private const ORDER_TOTAL_LINE_NAME = 'Order total';
-    private const ORDER_TOTAL_REFERENCE = 'WHMCS-ORDER-TOTAL';
-
     /** Fallback name for an invoice item that carries neither a mapped name nor a description. */
     private const FALLBACK_LINE_NAME = 'Item';
+
+    /** How many times to poll for a freshly-exported PDF token before giving up. */
+    private const PDF_EXPORT_POLL_ATTEMPTS = 3;
+
+    /** Seconds to wait between PDF token polls (export is asynchronous). */
+    private const PDF_EXPORT_POLL_WAIT_SECONDS = 2;
 
     private MoloniClient $client;
 
@@ -58,6 +61,8 @@ class DocumentService
 
     private PaymentResolver $paymentResolver;
 
+    private CurrencyResolver $currency;
+
     public function __construct(MoloniClient $client, SettingsService $settings)
     {
         $this->client = $client;
@@ -66,8 +71,9 @@ class DocumentService
         $this->customers = new CustomerResolver($client, $settings, $this->countries);
         $this->products = new ProductResolver($client, $settings);
         $this->taxes = new TaxResolver($client);
-        $this->lines = new LineMapper();
+        $this->lines = new LineMapper($settings);
         $this->paymentResolver = new PaymentResolver($client, $settings);
+        $this->currency = new CurrencyResolver($client);
     }
 
     /**
@@ -94,6 +100,7 @@ class DocumentService
             $invoice = $order->invoiceid ? Whmcs::getInvoice((int) $order->invoiceid) : null;
             $items = $order->invoiceid ? Whmcs::getInvoiceItems((int) $order->invoiceid) : [];
 
+            $this->guardAgainstNoItems($orderId, $items);
             $this->guardAgainstMassPayment($orderId, $items);
 
             $payload = $this->buildDocumentPayload($order, $invoice, $items, $documentType);
@@ -126,6 +133,24 @@ class DocumentService
 
             throw new DocumentException($e->getMessage(), $data, 0, $e);
         }
+    }
+
+    /**
+     * A document must have at least one billable line. An order with no invoice
+     * (or an invoice with no items) cannot be turned into a Moloni document, so
+     * it is refused — mirroring the classic Moloni WHMCS plugin, which required
+     * invoice items.
+     *
+     * @param array<int,object> $items tblinvoiceitems rows
+     * @throws DocumentException when the order has no invoice items
+     */
+    private function guardAgainstNoItems(int $orderId, array $items): void
+    {
+        if ($items !== []) {
+            return;
+        }
+
+        throw new DocumentException('Order has no invoice items to bill.', ['order_id' => $orderId]);
     }
 
     /**
@@ -166,7 +191,7 @@ class DocumentService
     {
         $client = $order->userid ? Whmcs::getClient((int) $order->userid) : null;
         $fiscalZone = $this->resolveFiscalZone($client);
-        $reference = '#' . ($order->ordernum ?: $order->id);
+        $exchange = $this->currency->resolve($client);
         $now = date('Y-m-d H:i:s');
 
         $payload = [
@@ -178,18 +203,25 @@ class DocumentService
             // Always create as draft; the document is only closed afterwards
             // once we've confirmed Moloni's total matches the order total.
             'status' => DocumentStatus::DRAFT,
-            'ourReference' => $reference,
-            'yourReference' => $reference,
+            // Mirrors the classic plugin: our reference is the WHMCS invoice id,
+            // your reference the (optional) WHMCS invoice number.
+            'ourReference' => (string) ($invoice->id ?? $order->id),
+            'yourReference' => trim((string) ($invoice->invoicenum ?? '')),
             'products' => $this->resolveProductLines(
                 $items,
-                (float) $order->amount,
                 $invoice,
                 $fiscalZone,
-                (int) $order->invoiceid
+                (int) $order->invoiceid,
+                $exchange
             ),
         ];
 
-        $payments = $this->resolvePayments($order, $documentType);
+        if ($exchange !== null) {
+            $payload['currencyExchangeId'] = $exchange->id();
+            $payload['currencyExchangeExchange'] = $exchange->rate();
+        }
+
+        $payments = $this->resolvePayments($order, $documentType, $exchange);
 
         if ($payments !== []) {
             $payload['payments'] = $payments;
@@ -219,7 +251,14 @@ class DocumentService
 
         $orderTotal = (float) $order->amount;
         $documentTotal = (float) ($result['documentTotal'] ?? $orderTotal);
-        $status = $this->closeIfRequested($documentId, $documentType, $orderTotal, $documentTotal, $orderId);
+
+        // The WHMCS order total is in the client currency. When the document was
+        // billed in a foreign currency, Moloni returns that order-currency total
+        // separately (currencyExchangeTotalValue) — reconcile against it; else
+        // the document's own base-currency total is already comparable.
+        $exchangeTotal = (float) ($result['currencyExchangeTotalValue'] ?? 0);
+        $comparableTotal = $exchangeTotal > 0.0 ? $exchangeTotal : $documentTotal;
+        $status = $this->closeIfRequested($documentId, $documentType, $orderTotal, $comparableTotal, $orderId);
 
         // A document is only e-mailed once it is actually closed (a draft has no
         // final number to send).
@@ -293,13 +332,13 @@ class DocumentService
 
             // The PDF token query is rejected until the PDF has been exported, so
             // generate it first when Moloni reports none yet. Generation is
-            // asynchronous, hence the short wait before requesting the token.
+            // asynchronous, so poll for the token instead of a single blind wait.
             if (empty($document['pdfExport'])) {
                 $this->client->createDocumentPdf($documentId, $documentType);
-                sleep(2);
+                $token = $this->pollForPdfToken($documentId, $documentType);
+            } else {
+                $token = $this->client->getDocumentPdfToken($documentId, $documentType);
             }
-
-            $token = $this->client->getDocumentPdfToken($documentId, $documentType);
         } catch (ApiException $e) {
             throw new DocumentException($e->getMessage(), $e->getData(), 0, $e);
         }
@@ -324,6 +363,40 @@ class DocumentService
             'filename' => (string) ($token['filename'] ?? ('document-' . $documentId . '.pdf')),
             'content' => $content,
         ];
+    }
+
+    /**
+     * Poll Moloni ON for a freshly-exported document's PDF token. The export is
+     * asynchronous, so the token query can be rejected or return empty for a
+     * short while after triggering it; retry a bounded number of times.
+     *
+     * @return array<string,mixed> the token payload, or [] if none was produced
+     * @throws ApiException if the token query kept failing across all attempts
+     */
+    private function pollForPdfToken(int $documentId, string $documentType): array
+    {
+        $lastError = null;
+
+        for ($attempt = 1; $attempt <= self::PDF_EXPORT_POLL_ATTEMPTS; $attempt++) {
+            sleep(self::PDF_EXPORT_POLL_WAIT_SECONDS);
+
+            try {
+                $token = $this->client->getDocumentPdfToken($documentId, $documentType);
+            } catch (ApiException $e) {
+                $lastError = $e;
+                continue;
+            }
+
+            if (!empty($token['path']) && !empty($token['token'])) {
+                return $token;
+            }
+        }
+
+        if ($lastError !== null) {
+            throw $lastError;
+        }
+
+        return [];
     }
 
     /**
@@ -354,7 +427,9 @@ class DocumentService
 
     /**
      * Resolve a document's Moloni type: its live apiCode, falling back to the
-     * type stored on the order, then to a plain invoice.
+     * type stored on the order, then to a plain invoice. The returned value uses
+     * the same vocabulary as {@see DocumentType} (e.g. "invoice"), so it is safe
+     * to feed straight into the `<type>GetPDF`/`<type>GetPDFToken` operations.
      *
      * @param array<string,mixed> $document
      */
@@ -407,22 +482,19 @@ class DocumentService
      *
      * @param array<int,object> $items tblinvoiceitems rows
      * @param object|null $invoice tblinvoices row (for taxrate/taxrate2)
+     * @param CurrencyExchange|null $exchange Applied to line prices when the
+     *        order currency differs from the company base currency.
      * @return array<int,array<string,mixed>>
      * @throws ApiException
      */
     private function resolveProductLines(
         array $items,
-        float $orderTotal,
         $invoice,
         FiscalZone $fiscalZone,
-        int $invoiceId
+        int $invoiceId,
+        ?CurrencyExchange $exchange
     ): array {
         $rates = $this->invoiceTaxRates($invoice);
-
-        if ($items === []) {
-            return [$this->singleOrderTotalLine($orderTotal, $rates, $fiscalZone)];
-        }
-
         $lines = [];
         $ordering = 1;
 
@@ -436,9 +508,14 @@ class DocumentService
                 continue;
             }
 
+            // WHMCS line amounts are in the client currency; convert to the
+            // company base currency when an exchange applies.
+            $amount = (float) ($item->amount ?? 0);
+            $price = $exchange !== null ? $exchange->toBase($amount) : $amount;
+
             $line = new LineInput(
                 $meta['name'] !== '' ? $meta['name'] : (string) ($item->description ?? self::FALLBACK_LINE_NAME),
-                (float) ($item->amount ?? 0),
+                $price,
                 $meta['reference'] !== '' ? $meta['reference'] : null,
                 $meta['summary'],
                 $meta['discount']
@@ -450,25 +527,6 @@ class DocumentService
         }
 
         return $lines;
-    }
-
-    /**
-     * The single fallback line used when an order carries no invoice items.
-     *
-     * $orderTotal (tblorders.amount) is tax-inclusive, but Moloni adds VAT on
-     * top of the line price, so send the net amount to avoid double-taxing
-     * (mirrors the net per-item amounts in {@see resolveProductLines()}).
-     *
-     * @param array<int,float> $rates
-     * @return array<string,mixed>
-     * @throws ApiException
-     */
-    private function singleOrderTotalLine(float $orderTotal, array $rates, FiscalZone $fiscalZone): array
-    {
-        $price = $this->netAmount($orderTotal, $rates);
-        $line = new LineInput(self::ORDER_TOTAL_LINE_NAME, $price, self::ORDER_TOTAL_REFERENCE);
-
-        return $this->buildLine($line, $rates, $fiscalZone, 1);
     }
 
     /**
@@ -531,33 +589,13 @@ class DocumentService
      * @return array<int,array<string,mixed>>
      * @throws ApiException
      */
-    private function resolvePayments($order, string $documentType): array
+    private function resolvePayments($order, string $documentType, ?CurrencyExchange $exchange): array
     {
         if (!DocumentType::hasPayments($documentType)) {
             return [];
         }
 
-        return $this->paymentResolver->resolve($order);
-    }
-
-    /**
-     * Convert a tax-inclusive amount to its net value for the given VAT rates.
-     * Line taxes are applied non-cumulatively, so the divisor is 1 + the sum
-     * of the rates. Returns the amount unchanged when there is no tax.
-     *
-     * @param array<int,float> $rates
-     */
-    private function netAmount(float $gross, array $rates): float
-    {
-        $totalRate = 0.0;
-
-        foreach ($rates as $rate) {
-            if ($rate > 0) {
-                $totalRate += $rate;
-            }
-        }
-
-        return $totalRate > 0.0 ? $gross / (1 + $totalRate / 100) : $gross;
+        return $this->paymentResolver->resolve($order, $exchange);
     }
 
     /**

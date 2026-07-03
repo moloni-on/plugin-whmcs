@@ -71,7 +71,6 @@ return [
 
     // Document types
     'doctype_invoice' => 'Invoice',
-    'doctype_receipt' => 'Receipt',
     'doctype_invoiceReceipt' => 'Invoice-Receipt',
     'doctype_simplifiedInvoice' => 'Simplified Invoice',
     'doctype_proFormaInvoice' => 'Pro Forma Invoice',
@@ -80,6 +79,10 @@ return [
 
     // Settings
     'settings_title' => 'Settings',
+    'settings_document_defaults' => 'Document defaults',
+    'settings_document_defaults_help' => 'What kind of document to create in Moloni ON and how it is issued.',
+    'settings_automation' => 'Automation',
+    'settings_automation_help' => 'When documents are created automatically and what happens after.',
     'setting_document_type' => 'Default document type',
     'setting_document_status' => 'Document status',
     'status_draft' => 'Draft',
@@ -97,9 +100,11 @@ return [
     'settings_product_mapping_help' => 'Defaults used when creating products in Moloni ON for order line items. Taxes are taken automatically from each order\'s VAT rate.',
     'setting_measurement_unit' => 'Measurement unit',
     'setting_product_category' => 'Product category',
+    'setting_custom_reference' => 'Product reference custom field',
+    'setting_custom_reference_help' => 'WHMCS product custom field whose description holds the Moloni reference for a hosting product. Leave as None to use the default reference.',
     'setting_exemption_reason' => 'Tax exemption reason',
     'setting_exemption_reason_help' => 'Exemption reason automatically applied to any line with no VAT (e.g. M07). Shown as a list when your fiscal zone defines reason codes, otherwise entered as free text.',
-    'settings_customer_mapping' => 'Customer & fiscal zone',
+    'settings_customer_mapping' => 'Tax & fiscal zone',
     'setting_fiscal_zone_based_on' => 'Fiscal zone based on',
     'setting_fiscal_zone_based_on_help' => 'Where the document fiscal zone comes from. Billing falls back to the company zone when the client has no country.',
     'fiscal_zone_company' => 'Company fiscal zone',

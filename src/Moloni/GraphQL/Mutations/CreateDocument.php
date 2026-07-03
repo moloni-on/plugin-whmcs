@@ -32,6 +32,7 @@ class CreateDocument extends AbstractOperation
                     documentId
                     number
                     totalValue
+                    currencyExchangeTotalValue
                     documentTotal
                     ourReference
                 }

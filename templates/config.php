@@ -13,6 +13,7 @@
  * @var array<int,array<string,mixed>> $productCategories
  * @var array<int,array<string,mixed>> $paymentMethods
  * @var array<int,array{code:string,name:string}> $exemptionReasons
+ * @var array<int,string> $productCustomFields
  */
 $current = static fn (string $key, string $default = ''): string => (string) ($settings[$key] ?? $default);
 ?>
@@ -22,6 +23,9 @@ $current = static fn (string $key, string $default = ''): string => (string) ($s
     <form method="post" action="<?= $e($url(['action' => 'config'])) ?>">
         <?= $csrf() ?>
         <input type="hidden" name="op" value="saveSettings">
+
+        <h5><?= $e($lang('settings_document_defaults')) ?></h5>
+        <p class="text-muted"><?= $e($lang('settings_document_defaults_help')) ?></p>
 
         <div class="form-group mb-3">
             <label for="document_type"><?= $e($lang('setting_document_type')) ?></label>
@@ -71,6 +75,10 @@ $current = static fn (string $key, string $default = ''): string => (string) ($s
             <small class="text-muted"><?= $e($lang('setting_payment_method_help')) ?></small>
         </div>
 
+        <hr>
+        <h5><?= $e($lang('settings_automation')) ?></h5>
+        <p class="text-muted"><?= $e($lang('settings_automation_help')) ?></p>
+
         <div class="form-check mb-3">
             <input type="checkbox" class="form-check-input" id="auto_create" name="auto_create" value="1"<?= $current('auto_create') === '1' ? ' checked' : '' ?>>
             <label class="form-check-label" for="auto_create"><?= $e($lang('setting_auto_create')) ?></label>
@@ -114,22 +122,16 @@ $current = static fn (string $key, string $default = ''): string => (string) ($s
         </div>
 
         <div class="form-group mb-3">
-            <label for="exemption_reason"><?= $e($lang('setting_exemption_reason')) ?></label>
-            <?php if (!empty($exemptionReasons)): ?>
-                <select class="form-control" id="exemption_reason" name="exemption_reason">
-                    <option value=""<?= $current('exemption_reason') === '' ? ' selected' : '' ?>><?= $e($lang('setting_option_none')) ?></option>
-                    <?php foreach ($exemptionReasons as $reason): ?>
-                        <?php $code = (string) ($reason['code'] ?? ''); ?>
-                        <option value="<?= $e($code) ?>" title="<?= $e($reason['name'] ?? '') ?>"<?= $current('exemption_reason') === $code ? ' selected' : '' ?>>
-                            <?= $e($code . ' - ' . ($reason['name'] ?? '')) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            <?php else: ?>
-                <input type="text" class="form-control" id="exemption_reason" name="exemption_reason"
-                       value="<?= $e($current('exemption_reason', '')) ?>">
-            <?php endif; ?>
-            <small class="text-muted"><?= $e($lang('setting_exemption_reason_help')) ?></small>
+            <label for="custom_reference"><?= $e($lang('setting_custom_reference')) ?></label>
+            <select class="form-control" id="custom_reference" name="custom_reference">
+                <option value=""<?= $current('custom_reference') === '' ? ' selected' : '' ?>><?= $e($lang('setting_option_none')) ?></option>
+                <?php foreach ($productCustomFields as $fieldName): ?>
+                    <option value="<?= $e($fieldName) ?>"<?= $current('custom_reference') === (string) $fieldName ? ' selected' : '' ?>>
+                        <?= $e($fieldName) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <small class="text-muted"><?= $e($lang('setting_custom_reference_help')) ?></small>
         </div>
 
         <hr>
@@ -149,6 +151,25 @@ $current = static fn (string $key, string $default = ''): string => (string) ($s
             <input type="text" class="form-control" id="vat_field" name="vat_field"
                    value="<?= $e($current('vat_field', '')) ?>">
             <small class="text-muted"><?= $e($lang('setting_vat_field_help')) ?></small>
+        </div>
+
+        <div class="form-group mb-3">
+            <label for="exemption_reason"><?= $e($lang('setting_exemption_reason')) ?></label>
+            <?php if (!empty($exemptionReasons)): ?>
+                <select class="form-control" id="exemption_reason" name="exemption_reason">
+                    <option value=""<?= $current('exemption_reason') === '' ? ' selected' : '' ?>><?= $e($lang('setting_option_none')) ?></option>
+                    <?php foreach ($exemptionReasons as $reason): ?>
+                        <?php $code = (string) ($reason['code'] ?? ''); ?>
+                        <option value="<?= $e($code) ?>" title="<?= $e($reason['name'] ?? '') ?>"<?= $current('exemption_reason') === $code ? ' selected' : '' ?>>
+                            <?= $e($code . ' - ' . ($reason['name'] ?? '')) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            <?php else: ?>
+                <input type="text" class="form-control" id="exemption_reason" name="exemption_reason"
+                       value="<?= $e($current('exemption_reason', '')) ?>">
+            <?php endif; ?>
+            <small class="text-muted"><?= $e($lang('setting_exemption_reason_help')) ?></small>
         </div>
 
         <button type="submit" class="btn btn-primary"><?= $e($lang('save_settings')) ?></button>

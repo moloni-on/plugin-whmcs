@@ -24,6 +24,7 @@ class SettingsService
     public const EXEMPTION_REASON = 'exemption_reason';
     public const FISCAL_ZONE_BASED_ON = 'fiscal_zone_based_on';
     public const VAT_FIELD = 'vat_field';
+    public const CUSTOM_REFERENCE = 'custom_reference';
 
     /** Document fiscal zone follows the Moloni company's own zone. */
     public const FISCAL_ZONE_COMPANY = 'company';
@@ -125,5 +126,15 @@ class SettingsService
     public function vatField(): string
     {
         return trim((string) $this->get(self::VAT_FIELD, ''));
+    }
+
+    /**
+     * Name of the WHMCS product custom field whose description holds the Moloni
+     * reference for a hosting product. Empty means hosting lines use the default
+     * reference.
+     */
+    public function customReference(): string
+    {
+        return trim((string) $this->get(self::CUSTOM_REFERENCE, ''));
     }
 }

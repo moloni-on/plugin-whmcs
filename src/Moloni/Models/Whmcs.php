@@ -179,6 +179,46 @@ class Whmcs
     }
 
     /**
+     * Distinct product custom-field names, used to populate the "custom
+     * reference" setting dropdown.
+     *
+     * @return array<int,string>
+     */
+    public static function productCustomFieldNames(): array
+    {
+        return Capsule::table('tblcustomfields')
+            ->where('type', 'product')
+            ->whereNotNull('fieldname')
+            ->where('fieldname', '!=', '')
+            ->distinct()
+            ->orderBy('fieldname')
+            ->pluck('fieldname')
+            ->all();
+    }
+
+    /**
+     * The description text of a product's custom field (matched by field name),
+     * used as that product's Moloni reference. Mirrors the classic Moloni WHMCS
+     * plugin, which stored the reference in the field's description.
+     */
+    public static function productCustomFieldDescription(int $packageId, string $fieldName): ?string
+    {
+        if ($fieldName === '' || $packageId <= 0) {
+            return null;
+        }
+
+        $row = Capsule::table('tblcustomfields')
+            ->where('type', 'product')
+            ->where('fieldname', $fieldName)
+            ->where('relid', $packageId)
+            ->first(['description']);
+
+        $value = isset($row->description) ? trim((string) $row->description) : '';
+
+        return $value !== '' ? $value : null;
+    }
+
+    /**
      * Promotion amount applied to an invoice line, as a positive number.
      *
      * WHMCS records promotions as separate negative line items ("PromoDomain"
@@ -220,13 +260,23 @@ class Whmcs
     /**
      * Orders joined with their client, most recent first.
      *
+     * When $paidOnly is true, only orders whose WHMCS invoice is "Paid" are
+     * returned (matching the classic plugin, which listed Paid invoices only).
+     *
      * @return array<int,object> rows with order + client_firstname/lastname/email/companyname
      */
-    public static function ordersWithClients(int $limit = 500): array
+    public static function ordersWithClients(int $limit = 500, bool $paidOnly = false): array
     {
-        return Capsule::table('tblorders')
+        $query = Capsule::table('tblorders')
             ->leftJoin('tblclients', 'tblorders.userid', '=', 'tblclients.id')
-            ->leftJoin('tblcurrencies', 'tblclients.currency', '=', 'tblcurrencies.id')
+            ->leftJoin('tblcurrencies', 'tblclients.currency', '=', 'tblcurrencies.id');
+
+        if ($paidOnly) {
+            $query->join('tblinvoices', 'tblorders.invoiceid', '=', 'tblinvoices.id')
+                ->where('tblinvoices.status', 'Paid');
+        }
+
+        return $query
             ->orderByDesc('tblorders.date')
             ->limit($limit)
             ->get([

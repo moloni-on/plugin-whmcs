@@ -117,13 +117,15 @@ class CustomerResolver
             $name = $contactName;
         }
 
+        $country = strtoupper(trim((string) ($whmcsClient->country ?? '')));
+
         $data = [
             'name' => $name !== '' ? $name : 'Customer',
             'email' => $email,
             'vat' => $vat,
             'address' => $this->address($whmcsClient),
             'city' => (string) ($whmcsClient->city ?? ''),
-            'zipCode' => (string) ($whmcsClient->postcode ?? ''),
+            'zipCode' => $this->validateZip((string) ($whmcsClient->postcode ?? ''), $country),
             'phone' => (string) ($whmcsClient->phonenumber ?? ''),
             'contactName' => $contactName,
         ];
@@ -151,6 +153,36 @@ class CustomerResolver
         }
 
         return $address;
+    }
+
+    /**
+     * Portuguese postcodes must be in the `NNNN-NNN` form for Moloni ON to
+     * accept them, so coerce PT zips into that shape (defaulting to "1000-100"
+     * when unusable). Non-PT zips are passed through unchanged. Ported from the
+     * classic Moloni WHMCS plugin.
+     */
+    private function validateZip(string $zipCode, string $country): string
+    {
+        if ($country !== 'PT') {
+            return $zipCode;
+        }
+
+        $digits = (string) preg_replace('/[^0-9]/', '', $zipCode);
+
+        // Pad up to seven digits so a partial code still yields NNNN-NNN.
+        if ($digits !== '' && strlen($digits) < 7) {
+            $digits = str_pad($digits, 7, '0');
+        }
+
+        if (strlen($digits) >= 7) {
+            $candidate = substr($digits, 0, 4) . '-' . substr($digits, 4, 3);
+
+            if (preg_match('/[0-9]{4}\-[0-9]{3}/', $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return '1000-100';
     }
 
     /**

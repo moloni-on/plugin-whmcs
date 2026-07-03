@@ -80,6 +80,15 @@ final class Company
     }
 
     /**
+     * The company's base currency as an ISO-4217 code (e.g. "EUR"), upper-cased,
+     * or "" when absent. Documents are stored in this currency.
+     */
+    public function getCurrencyCode(): string
+    {
+        return strtoupper((string) ($this->company['currency']['iso4217'] ?? ''));
+    }
+
+    /**
      * Predefined tax-exemption reasons for the company's fiscal zone, as
      * `{code,name}` rows. Empty when the zone has no predefined list (in which
      * case the exemption reason is entered as free text). Portugal, for example,

@@ -13,6 +13,7 @@ use Moloni\GraphQL\Mutations\SendDocumentMail;
 use Moloni\GraphQL\Mutations\UpdateCustomer;
 use Moloni\GraphQL\Mutations\UpdateDocumentStatus;
 use Moloni\GraphQL\Queries\GetCompany;
+use Moloni\GraphQL\Queries\GetCurrencyExchanges;
 use Moloni\GraphQL\Queries\GetCustomers;
 use Moloni\GraphQL\Queries\GetDocumentPdfToken;
 use Moloni\GraphQL\Queries\GetDocumentSets;
@@ -65,9 +66,9 @@ final class GraphQLOperationsTest extends TestCase
         self::assertSame('simplifiedInvoiceCreate', $create->operation());
         self::assertStringContainsString('$data: SimplifiedInvoiceInsert!', $create->query());
 
-        $update = new UpdateDocumentStatus('receipt');
-        self::assertSame('receiptUpdate', $update->operation());
-        self::assertStringContainsString('$data: ReceiptUpdate!', $update->query());
+        $update = new UpdateDocumentStatus('invoiceReceipt');
+        self::assertSame('invoiceReceiptUpdate', $update->operation());
+        self::assertStringContainsString('$data: InvoiceReceiptUpdate!', $update->query());
 
         $pdf = new GetDocumentPdfToken('proFormaInvoice');
         self::assertSame('proFormaInvoiceGetPDFToken', $pdf->operation());
@@ -179,6 +180,18 @@ final class GraphQLOperationsTest extends TestCase
         // VAT wins when both are present; no identifier yields no filter.
         self::assertSame('vat', $op->variables(['vat' => '1', 'email' => 'a@b.pt'])['options']['search']['field']);
         self::assertSame([], $op->variables([]));
+    }
+
+    public function testGetCurrencyExchangesSearchesByPair(): void
+    {
+        $op = new GetCurrencyExchanges();
+        $variables = $op->variables(['from' => 'eur', 'to' => 'usd']);
+
+        self::assertSame('currencyExchanges', $op->operation());
+        // The pair is matched by an upper-cased "FROM TO" search value.
+        self::assertSame(['field' => 'pair', 'value' => 'EUR USD'], $variables['options']['search']);
+        // The API rejects list queries without pagination, so it is always sent.
+        self::assertSame(['page' => 1, 'qty' => 50], $variables['options']['pagination']);
     }
 
     public function testUpdateCustomerWrapsData(): void

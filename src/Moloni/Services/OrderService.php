@@ -18,15 +18,16 @@ class OrderService
 {
     /**
      * WHMCS orders that still need action (not synced, not discarded), one page
-     * at a time. Filtering by tracking status happens in PHP, so the page is
-     * sliced from the assembled list rather than in SQL.
+     * at a time. Only orders with a Paid WHMCS invoice are listed (matching the
+     * classic plugin). Filtering by tracking status happens in PHP, so the page
+     * is sliced from the assembled list rather than in SQL.
      */
     public function getPendingOrders(int $page = 1, int $perPage = Paginator::PER_PAGE): Paginator
     {
         $tracking = $this->trackingByOrderId();
         $pending = [];
 
-        foreach (Whmcs::ordersWithClients() as $order) {
+        foreach (Whmcs::ordersWithClients(500, true) as $order) {
             $status = $tracking[(int) $order->id]->status ?? Order::STATUS_PENDING;
 
             if (in_array($status, [Order::STATUS_SYNCED, Order::STATUS_DISCARDED], true)) {
