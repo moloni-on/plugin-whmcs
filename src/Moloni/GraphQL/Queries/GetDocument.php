@@ -23,6 +23,7 @@ class GetDocument extends AbstractOperation
                 documentType {
                     documentTypeId
                     apiCode
+                    apiCodePlural
                 }
                 company {
                     companyId

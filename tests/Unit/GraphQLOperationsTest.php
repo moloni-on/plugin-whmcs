@@ -7,6 +7,7 @@ namespace Moloni\Tests\Unit;
 use Moloni\Enums\TaxFiscalZoneType;
 use Moloni\Enums\TaxType;
 use Moloni\GraphQL\Mutations\CreateDocument;
+use Moloni\GraphQL\Mutations\CreateDocumentPdf;
 use Moloni\GraphQL\Mutations\CreatePaymentMethod;
 use Moloni\GraphQL\Mutations\SendDocumentMail;
 use Moloni\GraphQL\Mutations\UpdateCustomer;
@@ -83,6 +84,15 @@ final class GraphQLOperationsTest extends TestCase
             ['options' => ['pagination' => ['page' => 1, 'qty' => 100]]],
             $op->variables()
         );
+    }
+
+    public function testCreateDocumentPdfNamesOperationByType(): void
+    {
+        $op = new CreateDocumentPdf('proFormaInvoice');
+
+        self::assertSame('proFormaInvoiceGetPDF', $op->operation());
+        self::assertStringContainsString('mutation proFormaInvoiceGetPDF', $op->query());
+        self::assertSame(['documentId' => 55], $op->variables(['documentId' => '55']));
     }
 
     public function testSendDocumentMailBuildsRecipientAndAttaches(): void

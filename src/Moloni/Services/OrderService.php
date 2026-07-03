@@ -50,13 +50,42 @@ class OrderService
             $page,
             (int) Document::query()->count(),
             $perPage,
-            static fn (int $offset, int $limit): array => Document::query()
-                ->orderByDesc('id')
-                ->offset($offset)
-                ->limit($limit)
-                ->get()
-                ->all()
+            fn (int $offset, int $limit): array => $this->withOrderMeta(
+                Document::query()
+                    ->orderByDesc('id')
+                    ->offset($offset)
+                    ->limit($limit)
+                    ->get()
+                    ->all()
+            )
         );
+    }
+
+    /**
+     * Attach the WHMCS order number and client currency to each stored document
+     * (documents only keep the order id) so the list can show them.
+     *
+     * @param array<int,object> $documents
+     * @return array<int,object>
+     */
+    private function withOrderMeta(array $documents): array
+    {
+        $orderIds = array_values(array_unique(array_map(
+            static fn ($doc): int => (int) $doc->order_id,
+            $documents
+        )));
+
+        $meta = Whmcs::orderMetaByIds($orderIds);
+
+        foreach ($documents as $doc) {
+            $row = $meta[(int) $doc->order_id] ?? null;
+            $doc->ordernum = $row->ordernum ?? null;
+            $doc->currency_code = $row->currency_code ?? null;
+            $doc->currency_prefix = $row->currency_prefix ?? null;
+            $doc->currency_suffix = $row->currency_suffix ?? null;
+        }
+
+        return $documents;
     }
 
     /**

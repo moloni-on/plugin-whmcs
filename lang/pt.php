@@ -52,6 +52,7 @@ return [
     'documents_title' => 'Documentos criados',
     'documents_empty' => 'Ainda não criaste documentos.',
     'download_pdf' => 'Descarregar PDF',
+    'view_in_moloni' => 'Ver no Moloni ON',
     'discarded_title' => 'Encomendas descartadas',
     'discarded_empty' => 'Não tens encomendas descartadas.',
     'revert' => 'Repor como pendente',
@@ -140,6 +141,7 @@ return [
     'redirecting' => 'A redirecionar para o Moloni ON…',
     'redirect_continue' => 'continuar',
     'pdf_download_failed' => 'Não foi possível transferir o PDF.',
+    'open_document_failed' => 'Não foi possível abrir o documento no Moloni ON.',
 
     // Resultados de operações
     'order_discarded' => 'Encomenda descartada.',

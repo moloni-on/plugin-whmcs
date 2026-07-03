@@ -6,6 +6,8 @@
  * @var callable $e
  * @var callable $postForm
  * @var callable $paginate
+ * @var callable $orderUrl
+ * @var callable $money
  * @var array<int,object> $discarded
  * @var \Moloni\Support\Paginator $discardedPagination
  */
@@ -21,6 +23,7 @@
                 <tr>
                     <th><?= $e($lang('col_order')) ?></th>
                     <th><?= $e($lang('col_customer')) ?></th>
+                    <th><?= $e($lang('col_amount')) ?></th>
                     <th><?= $e($lang('col_actions')) ?></th>
                 </tr>
             </thead>
@@ -28,8 +31,13 @@
                 <?php foreach ($discarded as $order) : ?>
                     <?php $customer = trim((string) ($order->client_companyname ?: ($order->client_firstname . ' ' . $order->client_lastname))); ?>
                     <tr>
-                        <td>#<?= $e($order->ordernum ?: $order->id) ?></td>
+                        <td>
+                            <a href="<?= $e($orderUrl((int) $order->id)) ?>" target="_blank" rel="noopener">
+                                #<?= $e($order->ordernum ?: $order->id) ?>
+                            </a>
+                        </td>
                         <td><?= $e($customer) ?></td>
+                        <td><?= $e($money((float) $order->amount, $order)) ?></td>
                         <td>
                             <?= $postForm(
                                 ['op' => 'revert', 'order_id' => $order->id],

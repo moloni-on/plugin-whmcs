@@ -52,7 +52,9 @@ Created by `src/Moloni/Database/Installer.php` on module activation.
 
 ## UI pages (`templates/`)
 
-`login.php` → `company.php` → dashboard: Orders (`document.php`), Documents (`documents.php`), Discarded (`discarded.php`), Settings (`config.php`), Tools (`tools.php`), Logs (`logs.php`). All list pages paginate server-side at 15/page via `Support\Paginator` + `Blocks/pagination.php`. Reusable parts in `Blocks/`, Bootstrap modals in `Modals/`.
+`login.php` → `company.php` → dashboard: Orders (`orders.php`), Documents (`documents.php`), Discarded (`discarded.php`), Settings (`config.php`), Tools (`tools.php`), Logs (`logs.php`). All list pages paginate server-side at 15/page via `Support\Paginator` + `Blocks/pagination.php`. Reusable parts in `Blocks/`, Bootstrap modals in `Modals/`. Orders/documents/discarded show the order number as a link to the WHMCS admin order view (`$orderUrl` template helper) and the amount in the client's currency (`$money` helper; documents are enriched with order number + currency via `Whmcs::orderMetaByIds()`). Documents also link to the document on the Moloni ON site (`op=openDocument` → `DocumentService::documentViewUrl()`, built from `company.slug` + `documentType.apiCodePlural`).
+
+**PDF download is two-step:** the `<type>GetPDFToken` query is rejected until the PDF has been exported, so `DocumentService::downloadPdf()` first calls `getDocument` and, when `pdfExport` is empty, runs the `<type>GetPDF` mutation (`CreateDocumentPdf`) and briefly waits before requesting the token. The `downloadPdf`/`openDocument` ops run after auth + company resolution so the API client has a token and company id.
 
 ## Conventions
 

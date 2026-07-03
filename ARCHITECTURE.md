@@ -68,7 +68,7 @@
 **Pages:**
 - `login.php` - API key authentication
 - `company.php` - Company selection
-- `document.php` - Orders pending sync
+- `orders.php` - Orders pending sync
 - `documents.php` - Created documents list
 - `discarded.php` - Orders marked "do not sync"
 - `config.php` - Settings management

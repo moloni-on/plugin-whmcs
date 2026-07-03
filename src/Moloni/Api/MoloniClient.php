@@ -9,6 +9,7 @@ use Moloni\Exceptions\ApiException;
 use Moloni\GraphQL\AbstractOperation;
 use Moloni\GraphQL\Mutations\CreateCustomer;
 use Moloni\GraphQL\Mutations\CreateDocument;
+use Moloni\GraphQL\Mutations\CreateDocumentPdf;
 use Moloni\GraphQL\Mutations\CreatePaymentMethod;
 use Moloni\GraphQL\Mutations\CreateProduct;
 use Moloni\GraphQL\Mutations\CreateTax;
@@ -303,6 +304,18 @@ class MoloniClient
     public function getDocument(int $documentId): array
     {
         return $this->run(new GetDocument(), ['documentId' => $documentId]);
+    }
+
+    /**
+     * Generate (export) a document's PDF. Must run before requesting a PDF token
+     * for a document whose PDF has not been exported yet.
+     *
+     * @return array<string,mixed>
+     * @throws ApiException
+     */
+    public function createDocumentPdf(int $documentId, string $documentType = DocumentType::INVOICE): array
+    {
+        return $this->run(new CreateDocumentPdf($documentType), ['documentId' => $documentId]);
     }
 
     /**

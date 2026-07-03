@@ -32,7 +32,7 @@ class Dispatcher
     private const MODULE_SLUG = 'moloni_on';
     private const MODULE_PATH = 'addonmodules.php?module=' . self::MODULE_SLUG;
 
-    /** Dashboard pages the router will render (keep in sync with pageData/pageTemplate). */
+    /** Dashboard pages the router will render (each maps to templates/<page>.php + pageData). */
     private const PAGES = ['orders', 'documents', 'discarded', 'config', 'tools', 'logs'];
 
     private Container $container;
@@ -74,11 +74,6 @@ class Dispatcher
         }
 
         try {
-            // Streaming actions terminate the request themselves.
-            if ($op === 'downloadPdf') {
-                $this->streamPdf($this->request->queryInt('document_id'));
-            }
-
             // 1. Start the OAuth flow from the login form.
             if ($op === 'connect') {
                 return $this->connect();
@@ -94,6 +89,17 @@ class Dispatcher
 
             if ($companyPage !== null) {
                 return $companyPage;
+            }
+
+            // Document actions that hit the API and terminate/redirect the
+            // request themselves. Placed after auth + company so the API client
+            // has a valid token and company id.
+            if ($op === 'downloadPdf') {
+                $this->streamPdf($this->request->queryInt('document_id'));
+            }
+
+            if ($op === 'openDocument') {
+                return $this->openDocument($this->request->queryInt('document_id'));
             }
 
             // 4. Logout. Keyed on the POST op so it inherits the CSRF check
@@ -301,12 +307,35 @@ class Dispatcher
         return $this->redirect($url);
     }
 
+    /**
+     * Redirect the admin to view the document on the Moloni ON website.
+     */
+    private function openDocument(int $documentId): string
+    {
+        try {
+            $url = $this->container->documents()->documentViewUrl($documentId);
+        } catch (MoloniException $e) {
+            LoggerFacade::error('Open document failed.', [
+                'document_id' => $documentId,
+                'error' => $e->getMessage(),
+            ] + $e->getData());
+            $this->error(Lang::get('open_document_failed'));
+
+            return $this->renderPage('documents');
+        }
+
+        return $this->redirect($url);
+    }
+
     private function streamPdf(int $documentId): void
     {
         try {
             $pdf = $this->container->documents()->downloadPdf($documentId);
         } catch (MoloniException $e) {
-            LoggerFacade::error('PDF download failed.', ['document_id' => $documentId, 'error' => $e->getMessage()]);
+            LoggerFacade::error('PDF download failed.', [
+                'document_id' => $documentId,
+                'error' => $e->getMessage(),
+            ] + $e->getData());
             header('HTTP/1.1 500 Internal Server Error');
             echo Lang::get('pdf_download_failed');
             exit;
@@ -333,7 +362,7 @@ class Dispatcher
         // sets load failure) that sharedData() then snapshots for rendering.
         $pageData = $this->pageData($page);
         $data = $this->sharedData($page) + $pageData;
-        $body = $this->container->template()->render($this->pageTemplate($page), $data);
+        $body = $this->container->template()->render($page, $data);
 
         return $this->renderLayout($body, $data, true);
     }
@@ -557,11 +586,6 @@ class Dispatcher
         ];
     }
 
-    private function pageTemplate(string $page): string
-    {
-        // The orders page template file is named document.php per the spec.
-        return $page === 'orders' ? 'document' : $page;
-    }
 
     private function redirect(string $url): string
     {

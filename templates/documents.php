@@ -6,6 +6,8 @@
  * @var callable $url
  * @var callable $e
  * @var callable $paginate
+ * @var callable $orderUrl
+ * @var callable $money
  * @var array<int,object> $documents
  * @var \Moloni\Support\Paginator $documentsPagination
  */
@@ -29,15 +31,24 @@
             <tbody>
                 <?php foreach ($documents as $document) : ?>
                     <tr>
-                        <td>#<?= $e($document->order_id) ?></td>
+                        <td>
+                            <a href="<?= $e($orderUrl((int) $document->order_id)) ?>" target="_blank" rel="noopener">
+                                #<?= $e($document->ordernum ?: $document->order_id) ?>
+                            </a>
+                        </td>
                         <td><?= $e($document->invoice_id) ?></td>
                         <td><?= $e($document->invoice_date) ?></td>
-                        <td><?= $e(number_format((float) $document->invoice_total, 2)) ?></td>
-                        <td>
+                        <td><?= $e($money((float) $document->invoice_total, $document)) ?></td>
+                        <td class="moloni-on__row-actions">
                             <a class="btn btn-sm btn-outline-primary"
                                href="<?= $e($url(['op' => 'downloadPdf', 'document_id' => $document->invoice_id])) ?>"
                                target="_blank" rel="noopener">
                                 <?= $e($lang('download_pdf')) ?>
+                            </a>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="<?= $e($url(['op' => 'openDocument', 'document_id' => $document->invoice_id])) ?>"
+                               target="_blank" rel="noopener">
+                                <?= $e($lang('view_in_moloni')) ?>
                             </a>
                         </td>
                     </tr>

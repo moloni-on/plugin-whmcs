@@ -31,6 +31,40 @@ class Whmcs
     }
 
     /**
+     * Order number + client currency for a set of order ids, keyed by order id.
+     * Used to enrich stored documents (which only keep the order id) for display.
+     *
+     * @param array<int,int> $orderIds
+     * @return array<int,object>
+     */
+    public static function orderMetaByIds(array $orderIds): array
+    {
+        if ($orderIds === []) {
+            return [];
+        }
+
+        $rows = Capsule::table('tblorders')
+            ->leftJoin('tblclients', 'tblorders.userid', '=', 'tblclients.id')
+            ->leftJoin('tblcurrencies', 'tblclients.currency', '=', 'tblcurrencies.id')
+            ->whereIn('tblorders.id', $orderIds)
+            ->get([
+                'tblorders.id',
+                'tblorders.ordernum',
+                'tblcurrencies.code as currency_code',
+                'tblcurrencies.prefix as currency_prefix',
+                'tblcurrencies.suffix as currency_suffix',
+            ]);
+
+        $map = [];
+
+        foreach ($rows as $row) {
+            $map[(int) $row->id] = $row;
+        }
+
+        return $map;
+    }
+
+    /**
      * Line items for the invoice attached to an order.
      *
      * @return array<int,object>

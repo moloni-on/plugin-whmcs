@@ -287,9 +287,18 @@ class DocumentService
      */
     public function downloadPdf(int $documentId): array
     {
-        $documentType = Order::documentTypeFor((string) $documentId) ?: DocumentType::INVOICE;
-
         try {
+            $document = $this->client->getDocument($documentId);
+            $documentType = $this->resolveDocumentType($document, $documentId);
+
+            // The PDF token query is rejected until the PDF has been exported, so
+            // generate it first when Moloni reports none yet. Generation is
+            // asynchronous, hence the short wait before requesting the token.
+            if (empty($document['pdfExport'])) {
+                $this->client->createDocumentPdf($documentId, $documentType);
+                sleep(2);
+            }
+
             $token = $this->client->getDocumentPdfToken($documentId, $documentType);
         } catch (ApiException $e) {
             throw new DocumentException($e->getMessage(), $e->getData(), 0, $e);
@@ -315,6 +324,49 @@ class DocumentService
             'filename' => (string) ($token['filename'] ?? ('document-' . $documentId . '.pdf')),
             'content' => $content,
         ];
+    }
+
+    /**
+     * Build the Moloni ON web URL to view a document, e.g.
+     * `https://ac.molonion.pt/<slug>/invoices/view/<id>`.
+     *
+     * @throws DocumentException
+     */
+    public function documentViewUrl(int $documentId): string
+    {
+        try {
+            $document = $this->client->getDocument($documentId);
+        } catch (ApiException $e) {
+            throw new DocumentException($e->getMessage(), $e->getData(), 0, $e);
+        }
+
+        $slug = trim((string) ($document['company']['slug'] ?? ''));
+        $plural = trim((string) ($document['documentType']['apiCodePlural'] ?? ''));
+
+        if ($slug === '' || $plural === '') {
+            throw new DocumentException('Moloni ON did not return the document location.', [
+                'document_id' => $documentId,
+            ]);
+        }
+
+        return Platform::AC_URL . $slug . '/' . $plural . '/view/' . $documentId;
+    }
+
+    /**
+     * Resolve a document's Moloni type: its live apiCode, falling back to the
+     * type stored on the order, then to a plain invoice.
+     *
+     * @param array<string,mixed> $document
+     */
+    private function resolveDocumentType(array $document, int $documentId): string
+    {
+        $apiCode = trim((string) ($document['documentType']['apiCode'] ?? ''));
+
+        if ($apiCode !== '') {
+            return $apiCode;
+        }
+
+        return Order::documentTypeFor((string) $documentId) ?: DocumentType::INVOICE;
     }
 
     /**

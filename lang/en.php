@@ -50,6 +50,7 @@ return [
     'documents_title' => 'Created documents',
     'documents_empty' => 'No documents have been created yet.',
     'download_pdf' => 'Download PDF',
+    'view_in_moloni' => 'View in Moloni ON',
     'discarded_title' => 'Discarded orders',
     'discarded_empty' => 'No discarded orders.',
     'revert' => 'Move to pending',
@@ -138,6 +139,7 @@ return [
     'redirecting' => 'Redirecting to Moloni ON…',
     'redirect_continue' => 'continue',
     'pdf_download_failed' => 'Could not download PDF.',
+    'open_document_failed' => 'Could not open the document in Moloni ON.',
 
     // Operation results
     'order_discarded' => 'Order discarded.',
