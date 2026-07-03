@@ -7,6 +7,7 @@ namespace Moloni\Services;
 use Moloni\Api\MoloniClient;
 use Moloni\Exceptions\ApiException;
 use Moloni\Exceptions\DocumentException;
+use Moloni\Facades\LoggerFacade;
 use Moloni\Models\Whmcs;
 
 /**
@@ -169,20 +170,19 @@ class CustomerResolver
 
         $digits = (string) preg_replace('/[^0-9]/', '', $zipCode);
 
-        // Pad up to seven digits so a partial code still yields NNNN-NNN.
-        if ($digits !== '' && strlen($digits) < 7) {
-            $digits = str_pad($digits, 7, '0');
+        if ($digits === '') {
+            LoggerFacade::warning('PT customer has no usable postcode; defaulted to 1000-100.', [
+                'postcode' => $zipCode,
+            ]);
+
+            return '1000-100';
         }
 
-        if (strlen($digits) >= 7) {
-            $candidate = substr($digits, 0, 4) . '-' . substr($digits, 4, 3);
+        // Keep the leading digits and pad a partial code so it still yields the
+        // NNNN-NNN shape Moloni ON requires for PT.
+        $digits = str_pad(substr($digits, 0, 7), 7, '0');
 
-            if (preg_match('/[0-9]{4}\-[0-9]{3}/', $candidate)) {
-                return $candidate;
-            }
-        }
-
-        return '1000-100';
+        return substr($digits, 0, 4) . '-' . substr($digits, 4, 3);
     }
 
     /**

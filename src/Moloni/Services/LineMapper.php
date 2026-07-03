@@ -27,6 +27,9 @@ class LineMapper
 
     private SettingsService $settings;
 
+    /** @var array<string,string|null> Memoised custom-field descriptions, keyed "field|package". */
+    private array $referenceCache = [];
+
     public function __construct(SettingsService $settings)
     {
         $this->settings = $settings;
@@ -165,7 +168,7 @@ class LineMapper
         $packageId = (int) ($hosting->packageid ?? 0);
 
         if ($fieldName !== '' && $packageId > 0) {
-            $custom = Whmcs::productCustomFieldDescription($packageId, $fieldName);
+            $custom = $this->customReferenceFor($fieldName, $packageId);
 
             if ($custom !== null) {
                 return $custom;
@@ -173,6 +176,21 @@ class LineMapper
         }
 
         return self::HOSTING_REFERENCE;
+    }
+
+    /**
+     * A product's custom-field description, memoised per (field, package) so a
+     * bulk run over many orders/lines that share a package hits the DB once.
+     */
+    private function customReferenceFor(string $fieldName, int $packageId): ?string
+    {
+        $key = $fieldName . '|' . $packageId;
+
+        if (!array_key_exists($key, $this->referenceCache)) {
+            $this->referenceCache[$key] = Whmcs::productCustomFieldDescription($packageId, $fieldName);
+        }
+
+        return $this->referenceCache[$key];
     }
 
     /**

@@ -204,9 +204,10 @@ class DocumentService
             // once we've confirmed Moloni's total matches the order total.
             'status' => DocumentStatus::DRAFT,
             // Mirrors the classic plugin: our reference is the WHMCS invoice id,
-            // your reference the (optional) WHMCS invoice number.
+            // your reference the WHMCS invoice number, falling back to the order
+            // number so the document always carries a human reference.
             'ourReference' => (string) ($invoice->id ?? $order->id),
-            'yourReference' => trim((string) ($invoice->invoicenum ?? '')),
+            'yourReference' => $this->yourReference($order, $invoice),
             'products' => $this->resolveProductLines(
                 $items,
                 $invoice,
@@ -231,6 +232,25 @@ class DocumentService
     }
 
     /**
+     * The document's "your reference": the WHMCS invoice number when present,
+     * otherwise the order number (WHMCS default numbering leaves invoicenum
+     * empty), so the field is never blank.
+     *
+     * @param object $order tblorders row
+     * @param object|null $invoice tblinvoices row
+     */
+    private function yourReference($order, $invoice): string
+    {
+        $invoiceNumber = trim((string) ($invoice->invoicenum ?? ''));
+
+        if ($invoiceNumber !== '') {
+            return $invoiceNumber;
+        }
+
+        return '#' . ($order->ordernum ?: $order->id);
+    }
+
+    /**
      * Create the document in Moloni ON, then close it when the totals match the
      * order (see {@see closeIfRequested()}).
      *
@@ -252,13 +272,15 @@ class DocumentService
         $orderTotal = (float) $order->amount;
         $documentTotal = (float) ($result['documentTotal'] ?? $orderTotal);
 
-        // The WHMCS order total is in the client currency. When the document was
-        // billed in a foreign currency, Moloni returns that order-currency total
-        // separately (currencyExchangeTotalValue) — reconcile against it; else
-        // the document's own base-currency total is already comparable.
+        // The WHMCS order total is in the client currency, whereas Moloni stores
+        // documentTotal in the company base currency. For a foreign-currency
+        // document Moloni also returns the total converted back to the client
+        // currency (currencyExchangeTotalValue = exchange * totalValue); it is 0
+        // for same-currency documents. Reconcile — and store/display — in the
+        // client currency so the figure lines up with the WHMCS order total.
         $exchangeTotal = (float) ($result['currencyExchangeTotalValue'] ?? 0);
-        $comparableTotal = $exchangeTotal > 0.0 ? $exchangeTotal : $documentTotal;
-        $status = $this->closeIfRequested($documentId, $documentType, $orderTotal, $comparableTotal, $orderId);
+        $clientCurrencyTotal = $exchangeTotal > 0.0 ? $exchangeTotal : $documentTotal;
+        $status = $this->closeIfRequested($documentId, $documentType, $orderTotal, $clientCurrencyTotal, $orderId);
 
         // A document is only e-mailed once it is actually closed (a draft has no
         // final number to send).
@@ -266,7 +288,7 @@ class DocumentService
             $this->sendEmailIfRequested($documentId, $documentType, $order);
         }
 
-        return ['id' => $documentId, 'total' => $documentTotal, 'status' => $status];
+        return ['id' => $documentId, 'total' => $clientCurrencyTotal, 'status' => $status];
     }
 
     /**
