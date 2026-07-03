@@ -192,6 +192,7 @@ class Whmcs
     {
         return Capsule::table('tblorders')
             ->leftJoin('tblclients', 'tblorders.userid', '=', 'tblclients.id')
+            ->leftJoin('tblcurrencies', 'tblclients.currency', '=', 'tblcurrencies.id')
             ->orderByDesc('tblorders.date')
             ->limit($limit)
             ->get([
@@ -207,6 +208,9 @@ class Whmcs
                 'tblclients.lastname as client_lastname',
                 'tblclients.companyname as client_companyname',
                 'tblclients.email as client_email',
+                'tblcurrencies.code as currency_code',
+                'tblcurrencies.prefix as currency_prefix',
+                'tblcurrencies.suffix as currency_suffix',
             ])
             ->all();
     }

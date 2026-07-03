@@ -31,8 +31,4 @@
 
         <button type="submit" class="btn btn-primary"><?= $e($lang('connect')) ?></button>
     </form>
-
-    <p class="moloni-on__help">
-        <a href="https://ac.molonion.pt/" target="_blank" rel="noopener"><?= $e($lang('login_help')) ?></a>
-    </p>
 </div>

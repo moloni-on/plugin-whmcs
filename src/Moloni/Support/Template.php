@@ -46,6 +46,12 @@ final class Template
         $csrf = fn (): string => $this->csrf();
         $postForm = fn (array $params, string $label, array $opts = []): string
             => $this->postForm($params, $label, $opts);
+        $paginate = fn (Paginator $paginator, array $baseParams = [], string $pageParam = 'page'): string
+            => $this->render('Blocks/pagination', [
+                'paginator' => $paginator,
+                'baseParams' => $baseParams,
+                'pageParam' => $pageParam,
+            ]);
 
         extract($data, EXTR_SKIP);
 
@@ -74,7 +80,13 @@ final class Template
         // Admin pages are served from /admin/, but addon assets live at the web
         // root, so a relative path would 404 under /admin/. Prepend the WHMCS
         // system URL when available to produce an absolute URL.
-        return $this->assetBase !== '' ? $this->assetBase . '/' . $relative : $relative;
+        $url = $this->assetBase !== '' ? $this->assetBase . '/' . $relative : $relative;
+
+        // Cache-bust on the module version so browsers refetch CSS/JS after an
+        // upgrade instead of serving a stale copy.
+        $separator = strpos($url, '?') === false ? '?' : '&';
+
+        return $url . $separator . 'v=' . rawurlencode(Platform::VERSION);
     }
 
     public function partial(string $template, array $data = []): void

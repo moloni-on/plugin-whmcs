@@ -8,12 +8,16 @@ use Moloni\Enums\TaxFiscalZoneType;
 use Moloni\Enums\TaxType;
 use Moloni\GraphQL\Mutations\CreateDocument;
 use Moloni\GraphQL\Mutations\CreatePaymentMethod;
+use Moloni\GraphQL\Mutations\SendDocumentMail;
 use Moloni\GraphQL\Mutations\UpdateCustomer;
 use Moloni\GraphQL\Mutations\UpdateDocumentStatus;
 use Moloni\GraphQL\Queries\GetCompany;
 use Moloni\GraphQL\Queries\GetCustomers;
 use Moloni\GraphQL\Queries\GetDocumentPdfToken;
+use Moloni\GraphQL\Queries\GetDocumentSets;
+use Moloni\GraphQL\Queries\GetMeasurementUnits;
 use Moloni\GraphQL\Queries\GetPaymentMethods;
+use Moloni\GraphQL\Queries\GetProductCategories;
 use Moloni\GraphQL\Queries\GetProducts;
 use Moloni\GraphQL\Queries\GetTaxes;
 use PHPUnit\Framework\TestCase;
@@ -66,6 +70,58 @@ final class GraphQLOperationsTest extends TestCase
 
         $pdf = new GetDocumentPdfToken('proFormaInvoice');
         self::assertSame('proFormaInvoiceGetPDFToken', $pdf->operation());
+    }
+
+    public function testGetDocumentSetsAlwaysSendsPagination(): void
+    {
+        $op = new GetDocumentSets();
+
+        self::assertSame('documentSets', $op->operation());
+        // The API rejects the query without pagination options, so they must be
+        // sent on every call regardless of input.
+        self::assertSame(
+            ['options' => ['pagination' => ['page' => 1, 'qty' => 100]]],
+            $op->variables()
+        );
+    }
+
+    public function testSendDocumentMailBuildsRecipientAndAttaches(): void
+    {
+        $op = new SendDocumentMail('simplifiedInvoice');
+
+        self::assertSame('simplifiedInvoiceSendMail', $op->operation());
+        self::assertStringContainsString('$documents: [Int]!', $op->query());
+
+        $variables = $op->variables(['documentId' => '42', 'name' => 'Acme', 'email' => 'a@b.pt']);
+
+        self::assertSame([42], $variables['documents']);
+        self::assertSame(['name' => 'Acme', 'email' => 'a@b.pt'], $variables['mailData']['to']);
+        self::assertTrue($variables['mailData']['attachment']);
+    }
+
+    public function testGetMeasurementUnitsAlwaysSendsPagination(): void
+    {
+        $op = new GetMeasurementUnits();
+
+        self::assertSame('measurementUnits', $op->operation());
+        self::assertSame(
+            ['options' => ['pagination' => ['page' => 1, 'qty' => 100]]],
+            $op->variables()
+        );
+    }
+
+    public function testGetProductCategoriesFiltersToRootAndPaginates(): void
+    {
+        $op = new GetProductCategories();
+        $variables = $op->variables();
+
+        self::assertSame('productCategories', $op->operation());
+        // Root categories only: a null parent.
+        self::assertContains(
+            ['field' => 'parentId', 'comparison' => 'eq', 'value' => null],
+            $variables['options']['filter']
+        );
+        self::assertSame(['page' => 1, 'qty' => 100], $variables['options']['pagination']);
     }
 
     public function testGetProductsFiltersByReference(): void
@@ -130,8 +186,18 @@ final class GraphQLOperationsTest extends TestCase
     {
         $query = new GetPaymentMethods();
         self::assertSame('paymentMethods', $query->operation());
+        // Pagination is always sent; a name search is added when provided.
         self::assertSame(
-            ['options' => ['search' => ['field' => 'name', 'value' => 'PayPal']]],
+            ['options' => ['pagination' => ['page' => 1, 'qty' => 100]]],
+            $query->variables()
+        );
+        self::assertSame(
+            [
+                'options' => [
+                    'pagination' => ['page' => 1, 'qty' => 100],
+                    'search' => ['field' => 'name', 'value' => 'PayPal'],
+                ],
+            ],
             $query->variables(['name' => 'PayPal'])
         );
 

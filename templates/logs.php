@@ -6,7 +6,10 @@
  * @var callable $url
  * @var callable $e
  * @var callable $postForm
+ * @var callable $paginate
  * @var array<int,object> $logs
+ * @var \Moloni\Support\Paginator $logsPagination
+ * @var array<string,string|int> $logFilters
  */
 $levels = ['', 'debug', 'info', 'notice', 'warning', 'error', 'critical'];
 $activeLevel = (string) ($_GET['level'] ?? '');
@@ -19,7 +22,7 @@ $activeLevel = (string) ($_GET['level'] ?? '');
                 <input type="hidden" name="module" value="moloni_on">
                 <input type="hidden" name="action" value="logs">
                 <select name="level" class="form-control" onchange="this.form.submit()">
-                    <?php foreach ($levels as $level): ?>
+                    <?php foreach ($levels as $level) : ?>
                         <option value="<?= $e($level) ?>"<?= $activeLevel === $level ? ' selected' : '' ?>>
                             <?= $e($level === '' ? $lang('logs_all_levels') : ucfirst($level)) ?>
                         </option>
@@ -34,9 +37,9 @@ $activeLevel = (string) ($_GET['level'] ?? '');
         </div>
     </div>
 
-    <?php if (empty($logs)): ?>
+    <?php if (empty($logs)) : ?>
         <p class="text-muted"><?= $e($lang('logs_empty')) ?></p>
-    <?php else: ?>
+    <?php else : ?>
         <table class="table table-striped moloni-on__table" data-moloni-table>
             <thead>
                 <tr>
@@ -48,18 +51,18 @@ $activeLevel = (string) ($_GET['level'] ?? '');
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($logs as $log): ?>
+                <?php foreach ($logs as $log) : ?>
                     <tr>
                         <td><?= $e($log->timestamp) ?></td>
                         <td><span class="badge moloni-on__level moloni-on__level--<?= $e($log->level) ?>"><?= $e($log->level) ?></span></td>
                         <td><?= $e($log->message) ?></td>
                         <td><?= $e($log->order_id ?? '') ?></td>
                         <td>
-                            <?php if (!empty($log->context)): ?>
-                                <button type="button" class="btn btn-link btn-sm moloni-on__context-btn"
-                                        data-moloni-log-context="<?= $e($log->context) ?>">
-                                    <?= $e($lang('view_context')) ?>
-                                </button>
+                            <button type="button" class="btn btn-link btn-sm moloni-on__context-btn"
+                                    data-moloni-log-context="<?= $e((string) ($log->context ?? '')) ?>">
+                                <?= $e($lang('view_context')) ?>
+                            </button>
+                            <?php if (!empty($log->context)) : ?>
                                 <noscript><code class="moloni-on__context"><?= $e($log->context) ?></code></noscript>
                             <?php endif; ?>
                         </td>
@@ -67,6 +70,8 @@ $activeLevel = (string) ($_GET['level'] ?? '');
                 <?php endforeach; ?>
             </tbody>
         </table>
+
+        <?= $paginate($logsPagination, ['action' => 'logs'] + $logFilters) ?>
 
         <div class="moloni-on__overlay" data-moloni-overlay hidden>
             <div class="moloni-on__overlay-dialog" role="dialog" aria-modal="true"
@@ -77,6 +82,10 @@ $activeLevel = (string) ($_GET['level'] ?? '');
                             data-moloni-overlay-close aria-label="<?= $e($lang('close')) ?>">&times;</button>
                 </div>
                 <pre class="moloni-on__overlay-body" data-moloni-overlay-body></pre>
+                <div class="moloni-on__overlay-foot">
+                    <button type="button" class="btn btn-secondary btn-sm"
+                            data-moloni-overlay-close><?= $e($lang('close')) ?></button>
+                </div>
             </div>
         </div>
     <?php endif; ?>

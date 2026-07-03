@@ -26,8 +26,17 @@ final class DocumentTypeTest extends TestCase
         $all = DocumentType::all();
 
         self::assertContains(DocumentType::INVOICE, $all);
-        self::assertContains(DocumentType::RECEIPT, $all);
+        self::assertContains(DocumentType::INVOICE_RECEIPT, $all);
         self::assertSame($all, array_values(array_unique($all)));
+    }
+
+    public function testReceiptIsNotOfferedAsBillingTarget(): void
+    {
+        $all = DocumentType::all();
+
+        self::assertNotContains(DocumentType::RECEIPT, $all);
+        // Bills of lading were removed from the plugin entirely.
+        self::assertNotContains('billsOfLading', $all);
     }
 
     public function testHasPaymentsOnlyForPaymentCarryingTypes(): void

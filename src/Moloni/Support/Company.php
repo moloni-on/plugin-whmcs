@@ -71,6 +71,29 @@ final class Company
         return (int) ($this->company['country']['countryId'] ?? 0);
     }
 
+    /**
+     * The company's fiscal zone code (e.g. "PT"), upper-cased, or "" when absent.
+     */
+    public function getFiscalZone(): string
+    {
+        return strtoupper((string) ($this->company['fiscalZone']['fiscalZone'] ?? ''));
+    }
+
+    /**
+     * Predefined tax-exemption reasons for the company's fiscal zone, as
+     * `{code,name}` rows. Empty when the zone has no predefined list (in which
+     * case the exemption reason is entered as free text). Portugal, for example,
+     * returns the legally-defined M-codes.
+     *
+     * @return array<int,array{code:string,name:string}>
+     */
+    public function getExemptionReasons(): array
+    {
+        $reasons = $this->company['fiscalZone']['exemption']['reasons'] ?? [];
+
+        return is_array($reasons) ? array_values($reasons) : [];
+    }
+
     // ---- Permissions ------------------------------------------------------
 
     public function hasApiClient(): bool

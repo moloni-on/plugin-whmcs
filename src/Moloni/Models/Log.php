@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Moloni\Models;
 
+use Illuminate\Database\Query\Builder;
+
 /**
  * Application log record (mod_moloni_on_logs).
  */
@@ -34,10 +36,33 @@ class Log extends AbstractModel
      * @param array{level?:string,order_id?:int,from?:string,to?:string} $filters
      * @return array<int,object>
      */
-    public static function fetch(array $filters = [], int $limit = 200): array
+    public static function fetch(array $filters = [], int $limit = 200, int $offset = 0): array
     {
-        $query = self::query();
+        return self::applyFilters(self::query(), $filters)
+            ->orderByDesc('timestamp')
+            ->offset(max(0, $offset))
+            ->limit($limit)
+            ->get()
+            ->all();
+    }
 
+    /**
+     * Count logs matching the given filters (for pagination totals).
+     *
+     * @param array{level?:string,order_id?:int,from?:string,to?:string} $filters
+     */
+    public static function countFiltered(array $filters = []): int
+    {
+        return (int) self::applyFilters(self::query(), $filters)->count();
+    }
+
+    /**
+     * Apply the shared log filters to a query builder.
+     *
+     * @param array{level?:string,order_id?:int,from?:string,to?:string} $filters
+     */
+    private static function applyFilters(Builder $query, array $filters): Builder
+    {
         if (!empty($filters['level'])) {
             $query->where('level', $filters['level']);
         }
@@ -54,11 +79,21 @@ class Log extends AbstractModel
             $query->where('timestamp', '<=', $filters['to']);
         }
 
-        return $query->orderByDesc('timestamp')->limit($limit)->get()->all();
+        return $query;
     }
 
-    public static function clear(): void
+    /**
+     * Delete log entries. With no cutoff, removes everything; with a cutoff
+     * (a 'Y-m-d H:i:s' timestamp) removes only entries strictly older than it.
+     */
+    public static function clear(?string $olderThan = null): void
     {
-        self::query()->truncate();
+        if ($olderThan === null) {
+            self::query()->truncate();
+
+            return;
+        }
+
+        self::query()->where('timestamp', '<', $olderThan)->delete();
     }
 }

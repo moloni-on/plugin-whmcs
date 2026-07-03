@@ -121,6 +121,11 @@ class AuthService
 
         if ((int) $row['access_expire'] - self::EXPIRY_SKEW <= time()) {
             if (!$this->refresh($row)) {
+                // Refresh token expired or the grant call failed: the session
+                // can no longer be recovered, so kill it. The admin must run
+                // the full login flow again.
+                $this->logout();
+
                 return false;
             }
 
@@ -174,6 +179,8 @@ class AuthService
     private function refresh(array $row): bool
     {
         if (empty($row['refresh_token']) || (int) $row['refresh_expire'] <= time()) {
+            LoggerFacade::warning('Refresh token missing or expired; re-authentication required.');
+
             return false;
         }
 

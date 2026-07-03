@@ -70,11 +70,19 @@
 - `company.php` - Company selection
 - `document.php` - Orders pending sync
 - `documents.php` - Created documents list
+- `discarded.php` - Orders marked "do not sync"
 - `config.php` - Settings management
 - `tools.php` - Utility functions (placeholder)
 - `logs.php` - Activity logs
-- `Blocks/` - Reusable UI components (header, nav, footer)
+- `Blocks/` - Reusable UI components (header, nav, footer, `pagination.php`)
 - `Modals/` - Bootstrap modals for confirmations, details
+
+The list pages (orders, documents, discarded, logs) are paginated server-side at
+`Paginator::PER_PAGE` (15) rows per page. Each page owns a single list and reads its
+1-based page from the `page` query param, rendering controls via the shared
+`Blocks/pagination.php` partial, exposed to templates as the
+`$paginate($paginator, $baseParams, $pageParam)` helper. `$baseParams` preserves the
+active tab and any filters (e.g. the log level) across page links.
 
 **Data Flow:**
 ```
@@ -204,7 +212,7 @@ class LogService {
     }
     
     public function clearLogs() {
-        // Delete all logs
+        // Delete log entries older than one week (recent activity is kept)
     }
 }
 ```
@@ -530,7 +538,7 @@ try {
 1. **OAuth2 Credential & Token Storage**
    - Client id/secret and access/refresh tokens stored in the single-row `mod_moloni_on_auth` table
    - Access limited to authenticated WHMCS admins
-   - Tokens auto-refresh; on refresh-token expiry the session is cleared and re-auth is required
+   - Tokens auto-refresh; when the refresh token is expired or the refresh grant call fails, the session tokens are cleared (`AuthService::logout`) and the admin must run the full login flow again
 
 2. **API Communication**
    - HTTPS only (enforced by Moloni ON); SSL peer + host verification enabled in the cURL client

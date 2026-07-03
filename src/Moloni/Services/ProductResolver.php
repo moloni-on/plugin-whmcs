@@ -6,7 +6,6 @@ namespace Moloni\Services;
 
 use Moloni\Api\MoloniClient;
 use Moloni\Enums\ProductType;
-use Moloni\Enums\ProductTypeAT;
 use Moloni\Exceptions\ApiException;
 
 /**
@@ -85,8 +84,9 @@ class ProductResolver
             'reference' => $reference,
             'summary' => '',
             'price' => $price,
+            // Every WHMCS line is billed as a non-stock service; a service needs
+            // no productAT (SAF-T goods classification).
             'type' => ProductType::SERVICE,
-            'productAT' => ['productType' => ProductTypeAT::GOODS],
             'hasStock' => false,
         ];
 

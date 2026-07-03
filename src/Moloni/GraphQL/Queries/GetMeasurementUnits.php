@@ -7,19 +7,20 @@ namespace Moloni\GraphQL\Queries;
 use Moloni\GraphQL\AbstractOperation;
 
 /**
- * Lists the company's document sets (séries), used when creating documents.
+ * Lists the company's measurement units, used to populate the product-mapping
+ * "measurement unit" setting on the config page.
  */
-class GetDocumentSets extends AbstractOperation
+class GetMeasurementUnits extends AbstractOperation
 {
-    protected const OPERATION = 'documentSets';
+    protected const OPERATION = 'measurementUnits';
 
     protected const QUERY = <<<'GRAPHQL'
-    query documentSets($companyId: Int!, $options: DocumentSetOptions) {
-        documentSets(companyId: $companyId, options: $options) {
+    query measurementUnits($companyId: Int!, $options: MeasurementUnitOptions) {
+        measurementUnits(companyId: $companyId, options: $options) {
             data {
-                documentSetId
+                measurementUnitId
                 name
-                isDefault
+                abbreviation
             }
             errors {
                 field
@@ -30,8 +31,8 @@ class GetDocumentSets extends AbstractOperation
     GRAPHQL;
 
     /**
-     * The API rejects the query unless pagination options are provided, so
-     * fetch the whole list in a single generous page.
+     * The API rejects list queries without pagination, so fetch the whole list
+     * in a single generous page.
      *
      * @param array<string,mixed> $data
      * @return array<string,mixed>

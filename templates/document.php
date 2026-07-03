@@ -10,21 +10,38 @@
  * @var callable $e
  * @var callable $csrf
  * @var callable $postForm
+ * @var callable $paginate
  * @var array<int,object> $orders
+ * @var \Moloni\Support\Paginator $ordersPagination
  * @var array<int,string> $documentTypes
  */
+
+// Format an order amount in the client's currency (WHMCS stores order totals in
+// the client's currency; prefix/suffix come from tblcurrencies, code as fallback).
+$formatAmount = static function ($order): string {
+    $amount = number_format((float) $order->amount, 2);
+    $prefix = trim((string) ($order->currency_prefix ?? ''));
+    $suffix = trim((string) ($order->currency_suffix ?? ''));
+    $code = trim((string) ($order->currency_code ?? ''));
+
+    if ($prefix === '' && $suffix === '') {
+        return $code !== '' ? $amount . ' ' . $code : $amount;
+    }
+
+    return $prefix . $amount . ($suffix !== '' ? ' ' . $suffix : '');
+};
 ?>
 <div class="moloni-on__panel">
     <h3><?= $e($lang('orders_title')) ?></h3>
 
-    <?php if (empty($orders)): ?>
+    <?php if (empty($orders)) : ?>
         <p class="text-muted"><?= $e($lang('orders_empty')) ?></p>
-    <?php else: ?>
+    <?php else : ?>
         <form method="post" action="<?= $e($url()) ?>" id="moloni-bulk-form" class="moloni-on__toolbar">
             <?= $csrf() ?>
             <input type="hidden" name="op" value="bulkCreate">
             <select name="document_type" class="form-control moloni-on__doc-type">
-                <?php foreach ($documentTypes as $type): ?>
+                <?php foreach ($documentTypes as $type) : ?>
                     <option value="<?= $e($type) ?>"><?= $e($lang('doctype_' . $type)) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -46,7 +63,7 @@
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($orders as $order): ?>
+                <?php foreach ($orders as $order) : ?>
                     <?php
                     $customer = trim((string) ($order->client_companyname ?: ($order->client_firstname . ' ' . $order->client_lastname)));
                     $isFailed = ($order->sync_status ?? '') === 'failed';
@@ -58,12 +75,12 @@
                             <?= $e($customer) ?><br>
                             <small class="text-muted"><?= $e($order->client_email) ?></small>
                         </td>
-                        <td><?= $e(number_format((float) $order->amount, 2)) ?></td>
+                        <td><?= $e($formatAmount($order)) ?></td>
                         <td><?= $e($order->date) ?></td>
                         <td>
-                            <?php if ($isFailed): ?>
+                            <?php if ($isFailed) : ?>
                                 <span class="badge bg-danger" title="<?= $e((string) $order->error_message) ?>"><?= $e($lang('status_failed')) ?></span>
-                            <?php else: ?>
+                            <?php else : ?>
                                 <span class="badge bg-secondary"><?= $e($lang('status_pending')) ?></span>
                             <?php endif; ?>
                         </td>
@@ -83,5 +100,7 @@
                 <?php endforeach; ?>
             </tbody>
         </table>
+
+        <?= $paginate($ordersPagination, ['action' => 'orders']) ?>
     <?php endif; ?>
 </div>

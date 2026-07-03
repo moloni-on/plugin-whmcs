@@ -14,11 +14,13 @@ return [
     'current_company' => 'Company',
     'nav_orders' => 'Orders',
     'nav_documents' => 'Documents',
+    'nav_discarded' => 'Discarded',
     'nav_settings' => 'Settings',
     'nav_tools' => 'Tools',
     'nav_logs' => 'Logs',
     'nav_logout' => 'Log out',
-    'footer_note' => 'Moloni ON for WHMCS',
+    'footer_help_lead' => 'Need help?',
+    'footer_help_link' => 'Check out our guides.',
 
     // Login
     'login_title' => 'Connect to Moloni ON',
@@ -26,7 +28,6 @@ return [
     'developer_id' => 'API Client ID',
     'client_secret' => 'Client secret',
     'connect' => 'Connect',
-    'login_help' => 'Where do I find my API credentials?',
     'credentials_required' => 'Please provide both the API client ID and secret.',
 
     // Company selection
@@ -75,7 +76,6 @@ return [
     'doctype_proFormaInvoice' => 'Pro Forma Invoice',
     'doctype_purchaseOrder' => 'Purchase Order',
     'doctype_estimate' => 'Estimate',
-    'doctype_billsOfLading' => 'Bill of Lading',
 
     // Settings
     'settings_title' => 'Settings',
@@ -85,14 +85,19 @@ return [
     'status_closed' => 'Closed',
     'setting_document_set' => 'Document set',
     'setting_document_set_unavailable' => 'Document sets unavailable (check connection)',
-    'setting_tax_exemption' => 'Apply tax exemption',
+    'document_sets_unavailable' => 'Could not load document sets from Moloni ON. Make sure your company has a document set (série) defined in Moloni ON, then reload this page.',
     'setting_auto_create' => 'Automatically create a document when an invoice is paid',
+    'setting_payment_method' => 'Default payment method',
+    'setting_payment_method_help' => 'Used when the order\'s payment gateway can\'t be matched to a Moloni ON payment method by name. Only added to document types that support payments.',
+    'setting_send_email' => 'E-mail the document to the customer after creating it',
+    'setting_send_email_help' => 'Only applies when the document status is Closed; drafts are never e-mailed.',
+    'setting_option_none' => '— None —',
     'settings_product_mapping' => 'Product mapping defaults',
-    'settings_product_mapping_help' => 'IDs used when creating products in Moloni ON for order line items. Leave 0 to omit. Taxes are taken automatically from each order\'s VAT rate.',
-    'setting_measurement_unit' => 'Measurement unit ID',
-    'setting_product_category' => 'Product category ID',
-    'setting_exemption_reason' => 'Tax exemption reason code',
-    'setting_exemption_reason_help' => 'Moloni exemption reason code applied to lines with a 0% tax rate (e.g. M07).',
+    'settings_product_mapping_help' => 'Defaults used when creating products in Moloni ON for order line items. Taxes are taken automatically from each order\'s VAT rate.',
+    'setting_measurement_unit' => 'Measurement unit',
+    'setting_product_category' => 'Product category',
+    'setting_exemption_reason' => 'Tax exemption reason',
+    'setting_exemption_reason_help' => 'Exemption reason automatically applied to any line with no VAT (e.g. M07). Shown as a list when your fiscal zone defines reason codes, otherwise entered as free text.',
     'settings_customer_mapping' => 'Customer & fiscal zone',
     'setting_fiscal_zone_based_on' => 'Fiscal zone based on',
     'setting_fiscal_zone_based_on_help' => 'Where the document fiscal zone comes from. Billing falls back to the company zone when the client has no country.',
@@ -115,12 +120,18 @@ return [
     'logs_title' => 'Logs',
     'logs_all_levels' => 'All levels',
     'logs_empty' => 'No log entries.',
-    'clear_logs' => 'Clear all logs',
-    'confirm_clear_logs' => 'Delete all log entries? This cannot be undone.',
+    'clear_logs' => 'Clear old logs',
+    'confirm_clear_logs' => 'Delete log entries older than a week? This cannot be undone.',
     'logs_cleared' => 'Logs cleared.',
     'view_context' => 'View',
     'log_context_title' => 'Log context',
     'close' => 'Close',
+
+    // Pagination
+    'pagination_label' => 'Pagination',
+    'pagination_prev' => 'Previous',
+    'pagination_next' => 'Next',
+    'pagination_summary' => 'Showing :from–:to of :total',
 
     // OAuth / misc
     'oauth_state_mismatch' => 'Authorization failed: the security token did not match. Please try connecting again.',

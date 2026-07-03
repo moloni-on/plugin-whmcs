@@ -35,8 +35,8 @@ Templates (UI)  →  moloni_on.php (output) / hooks.php
 - **Api** (`src/Moloni/Api/`): `ApiClient` (native-cURL HTTP: OAuth grant/refresh + GraphQL + `download()` for media/PDFs), `MoloniClient` (domain wrapper; `downloadMedia()` delegates to `ApiClient::download()`)
 - **GraphQL** (`src/Moloni/GraphQL/`): one class per query/mutation extending `AbstractOperation`; GraphQL string in the `QUERY` constant, plus `operation()` + `variables($data)`
 - **Models** (`src/Moloni/Models/`): `Order`, `Document`, `Config`, `Log`, `Auth` (extend `AbstractModel`); `Whmcs` reads native WHMCS tables
-- **Support** (`src/Moloni/Support/`): `Platform` (endpoints), `Context` (per-request session/token/company), `Company` (company payload + feature permissions via `limits`), `Lang` (i18n), `Template` (renderer), `Request` (typed view over the request superglobals, keeps `Dispatcher` testable), `FiscalZone` (code + countryId value object; centralises the `PT`/upper-case defaults), `LineInput` (billing fields of one document line: name/price/reference/summary/discount)
-- **Enums** (`src/Moloni/Enums/`): `DocumentType`, `DocumentStatus`, `ProductType`, `ProductTypeAT`, `TaxType`, `TaxFiscalZoneType`
+- **Support** (`src/Moloni/Support/`): `Platform` (endpoints), `Context` (per-request session/token/company), `Company` (company payload + feature permissions via `limits`), `Lang` (i18n), `Template` (renderer), `Request` (typed view over the request superglobals, keeps `Dispatcher` testable), `FiscalZone` (code + countryId value object; centralises the `PT`/upper-case defaults), `LineInput` (billing fields of one document line: name/price/reference/summary/discount), `Paginator` (immutable page state — items + totals — for the list views; `PER_PAGE`=15, built via `fromSlice()` for in-memory lists or `paginate()` for DB queries)
+- **Enums** (`src/Moloni/Enums/`): `DocumentType`, `DocumentStatus`, `ProductType`, `TaxType`, `TaxFiscalZoneType`
 - **Facades** (`src/Moloni/Facades/`): `LoggerFacade`
 - **Exceptions** (`src/Moloni/Exceptions/`): `MoloniException` base → `ApiException`, `DocumentException`, `AuthException`, `ValidationException`, `SkippedException` (order intentionally not billed, e.g. mass-payment invoice)
 
@@ -44,7 +44,7 @@ Templates (UI)  →  moloni_on.php (output) / hooks.php
 
 Created by `src/Moloni/Database/Installer.php` on module activation.
 
-- `mod_moloni_on_config` — key-value settings (document_type, document_status, document_set_id, tax_exemption, auto_create, measurement_unit_id, product_category_id, exemption_reason, fiscal_zone_based_on [company|billing], vat_field [client custom-field name for VAT]). Document-line VAT is derived from each WHMCS order's tax rate via `TaxResolver`, not stored here. When `tax_exemption` is on, lines that resolve to no VAT carry the configured `exemption_reason`; when off, untaxed lines carry no exemption reason.
+- `mod_moloni_on_config` — key-value settings (document_type, document_status, document_set_id, auto_create, send_email, payment_method_id, measurement_unit_id, product_category_id, exemption_reason, fiscal_zone_based_on [company|billing], vat_field [client custom-field name for VAT]). `payment_method_id` is the default payment method (dropdown from the `paymentMethods` query) used by `PaymentResolver` when a WHMCS gateway can't be matched to a Moloni method by name; payments are only attached to document types where `DocumentType::hasPayments()` is true. `send_email` e-mails the document to the customer after creation, but only once it is actually closed (via the `<type>SendMail` mutation); drafts and customers without an e-mail are skipped and logged, never fatal. The config page renders measurement_unit_id / product_category_id as dropdowns fetched live from Moloni ON (`measurementUnits` / root `productCategories` queries); exemption_reason is a dropdown of the company fiscal zone's predefined reason codes (from `company.fiscalZone.exemption.reasons`) when the zone defines them, else a free-text input. Document-line VAT is derived from each WHMCS order's tax rate via `TaxResolver`, not stored here. Any line that resolves to no VAT is automatically tax-exempt and carries the configured `exemption_reason` (there is no on/off toggle). Offered document types exclude receipts; bills of lading were removed from the plugin entirely.
 - `mod_moloni_on_auth` — single-row OAuth2 session (client_id, client_secret, access_token, refresh_token, expiries, company_id)
 - `mod_moloni_on_orders` — order sync tracking (order_id, moloni_document_id, status, …)
 - `mod_moloni_on_logs` — application logs (level, message, context, order_id, timestamp)
@@ -52,12 +52,12 @@ Created by `src/Moloni/Database/Installer.php` on module activation.
 
 ## UI pages (`templates/`)
 
-`login.php` → `company.php` → dashboard: Orders (`document.php`), Documents (`documents.php`), Settings (`config.php`), Tools (`tools.php`), Logs (`logs.php`). Reusable parts in `Blocks/`, Bootstrap modals in `Modals/`.
+`login.php` → `company.php` → dashboard: Orders (`document.php`), Documents (`documents.php`), Discarded (`discarded.php`), Settings (`config.php`), Tools (`tools.php`), Logs (`logs.php`). All list pages paginate server-side at 15/page via `Support\Paginator` + `Blocks/pagination.php`. Reusable parts in `Blocks/`, Bootstrap modals in `Modals/`.
 
 ## Conventions
 
 - **PHP 7.4+**, **PSR-12**, PSR-4 autoload for `Moloni\` → `src/Moloni/`.
-- **i18n**: no hardcoded UI strings — use `lang/en.php` and `lang/pt.php`. Portuguese uses first-person perspective.
+- **i18n**: no hardcoded UI strings — use `lang/en.php` and `lang/pt.php`. Portuguese addresses the user in the second person, informal ("tu"); system action results use neutral/passive phrasing (e.g. "Configurações guardadas.").
 - **Logging**: log all errors via `LogService`; no silent failures. Bulk operations continue past individual failures.
 - **Security**: API key in Authorization header (never query string); HTTPS only; validate order IDs and document types; rely on WHMCS CSRF tokens.
 

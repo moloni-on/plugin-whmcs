@@ -67,7 +67,7 @@ class DocumentService
         $this->products = new ProductResolver($client, $settings);
         $this->taxes = new TaxResolver($client);
         $this->lines = new LineMapper();
-        $this->paymentResolver = new PaymentResolver($client);
+        $this->paymentResolver = new PaymentResolver($client, $settings);
     }
 
     /**
@@ -220,6 +220,12 @@ class DocumentService
         $orderTotal = (float) $order->amount;
         $documentTotal = (float) ($result['documentTotal'] ?? $orderTotal);
         $status = $this->closeIfRequested($documentId, $documentType, $orderTotal, $documentTotal, $orderId);
+
+        // A document is only e-mailed once it is actually closed (a draft has no
+        // final number to send).
+        if ($status === DocumentStatus::CLOSED) {
+            $this->sendEmailIfRequested($documentId, $documentType, $order);
+        }
 
         return ['id' => $documentId, 'total' => $documentTotal, 'status' => $status];
     }
@@ -442,11 +448,9 @@ class DocumentService
             }
         }
 
-        // Lines with no VAT are marked tax-exempt (with the configured reason)
-        // only when the operator enabled tax exemption.
-        $exemptionReason = ($lineTaxes === [] && $this->settings->taxExemption())
-            ? $this->settings->exemptionReason()
-            : '';
+        // A line that resolves to no VAT is automatically tax-exempt and carries
+        // the configured exemption reason; taxed lines never carry one.
+        $exemptionReason = $lineTaxes === [] ? $this->settings->exemptionReason() : '';
 
         return [
             'productId' => $this->products->resolveId(
@@ -605,6 +609,66 @@ class DocumentService
         $this->client->updateDocumentStatus($documentId, DocumentStatus::CLOSED, $documentType);
 
         return DocumentStatus::CLOSED;
+    }
+
+    /**
+     * E-mail the closed document to the order's customer when the setting is on.
+     *
+     * Never fatal: the document already exists and is closed, so a mail failure
+     * (or a customer with no e-mail) is logged and swallowed rather than marking
+     * the whole order failed.
+     *
+     * @param object $order tblorders row
+     */
+    private function sendEmailIfRequested(int $documentId, string $documentType, $order): void
+    {
+        if (!$this->settings->sendEmail()) {
+            return;
+        }
+
+        $orderId = (int) $order->id;
+        $client = $order->userid ? Whmcs::getClient((int) $order->userid) : null;
+        $email = trim((string) ($client->email ?? ''));
+
+        if ($email === '') {
+            LoggerFacade::warning('Document not e-mailed: customer has no e-mail address.', [
+                'order_id' => $orderId,
+                'document_id' => $documentId,
+            ], $orderId);
+
+            return;
+        }
+
+        try {
+            $this->client->sendDocumentMail($documentId, $this->customerName($client), $email, $documentType);
+            LoggerFacade::info('Document e-mailed to customer.', [
+                'order_id' => $orderId,
+                'document_id' => $documentId,
+            ], $orderId);
+        } catch (ApiException $e) {
+            LoggerFacade::error('Failed to e-mail document.', [
+                'order_id' => $orderId,
+                'document_id' => $documentId,
+                'error' => $e->getMessage(),
+            ], $orderId);
+        }
+    }
+
+    /**
+     * Recipient name for a document e-mail: company name, else contact name,
+     * else a neutral fallback.
+     *
+     * @param object|null $client tblclients row
+     */
+    private function customerName($client): string
+    {
+        $name = trim((string) ($client->companyname ?? ''));
+
+        if ($name === '') {
+            $name = trim(($client->firstname ?? '') . ' ' . ($client->lastname ?? ''));
+        }
+
+        return $name !== '' ? $name : 'Customer';
     }
 
     /**

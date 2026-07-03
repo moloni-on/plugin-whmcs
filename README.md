@@ -29,8 +29,10 @@ from *Addons → Moloni ON*. Full step-by-step (DB tables, OAuth, settings) is i
 ## Configuration
 
 Settings live under the module's *Settings* tab: default document type & status, document set,
-tax-exemption reason, automatic creation on payment, and product-mapping ids (measurement
-unit, category). Document VAT is taken from each order's own tax rate — not a fixed setting.
+tax-exemption reason, automatic creation on payment, and product-mapping defaults (measurement
+unit, category — chosen from dropdowns fetched live from Moloni ON). Document VAT is taken from
+each order's own tax rate — not a fixed setting. Any line that resolves to no VAT is
+automatically tax-exempt and carries the configured reason.
 
 ## Project structure
 

@@ -9,19 +9,23 @@ use Moloni\Exceptions\ApiException;
 use Moloni\Models\Whmcs;
 
 /**
- * Builds a document's payment line from a WHMCS order's payment gateway,
- * resolving (or creating) the matching Moloni ON payment method by name.
+ * Builds a document's payment line from a WHMCS order's payment gateway.
  *
- * Mirrors the Moloni ON WooCommerce plugin: the payment is labelled with the
- * gateway's display name and valued at the order total.
+ * The Moloni ON payment method is matched by the gateway's display name; when no
+ * method matches, the configured default (settings) is used, and only if there
+ * is no default either is one created on the fly. The payment is labelled with
+ * the gateway's display name and valued at the order total.
  */
 class PaymentResolver
 {
     private MoloniClient $client;
 
-    public function __construct(MoloniClient $client)
+    private SettingsService $settings;
+
+    public function __construct(MoloniClient $client, SettingsService $settings)
     {
         $this->client = $client;
+        $this->settings = $settings;
     }
 
     /**
@@ -52,6 +56,11 @@ class PaymentResolver
     }
 
     /**
+     * Resolve the Moloni payment method id for a gateway name:
+     *   1. an existing method whose name matches the gateway,
+     *   2. otherwise the configured default payment method,
+     *   3. otherwise create one named after the gateway.
+     *
      * @throws ApiException
      */
     private function resolvePaymentMethodId(string $name): int
@@ -60,6 +69,12 @@ class PaymentResolver
 
         if ($existing !== null && !empty($existing['paymentMethodId'])) {
             return (int) $existing['paymentMethodId'];
+        }
+
+        $default = $this->settings->paymentMethodId();
+
+        if ($default > 0) {
+            return $default;
         }
 
         $created = $this->client->createPaymentMethod(['name' => $name]);

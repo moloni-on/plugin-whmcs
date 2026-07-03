@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Moloni\Services;
 
 use Moloni\Models\Log;
+use Moloni\Support\Paginator;
 use Throwable;
 
 /**
@@ -67,16 +68,25 @@ class LogService
     }
 
     /**
+     * A single page of logs, most recent first, matching the given filters.
+     *
      * @param array{level?:string,order_id?:int,from?:string,to?:string} $filters
-     * @return array<int,object>
      */
-    public function getLogs(array $filters = [], int $limit = 200): array
+    public function getLogs(array $filters = [], int $page = 1, int $perPage = Paginator::PER_PAGE): Paginator
     {
-        return Log::fetch($filters, $limit);
+        return Paginator::paginate(
+            $page,
+            Log::countFiltered($filters),
+            $perPage,
+            static fn (int $offset, int $limit): array => Log::fetch($filters, $limit, $offset)
+        );
     }
 
+    /**
+     * Remove log entries older than one week, keeping recent activity.
+     */
     public function clearLogs(): void
     {
-        Log::clear();
+        Log::clear(date('Y-m-d H:i:s', strtotime('-1 week')));
     }
 }

@@ -28,6 +28,13 @@ class GetCompany extends AbstractOperation
                 vat
                 fiscalZone {
                     fiscalZone
+                    exemption {
+                        type
+                        reasons {
+                            code
+                            name
+                        }
+                    }
                 }
                 country {
                     countryId

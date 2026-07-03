@@ -16,10 +16,11 @@ class SettingsService
     public const DOCUMENT_TYPE = 'document_type';
     public const DOCUMENT_STATUS = 'document_status';
     public const DOCUMENT_SET_ID = 'document_set_id';
-    public const TAX_EXEMPTION = 'tax_exemption';
     public const AUTO_CREATE = 'auto_create';
+    public const SEND_EMAIL = 'send_email';
     public const MEASUREMENT_UNIT_ID = 'measurement_unit_id';
     public const PRODUCT_CATEGORY_ID = 'product_category_id';
+    public const PAYMENT_METHOD_ID = 'payment_method_id';
     public const EXEMPTION_REASON = 'exemption_reason';
     public const FISCAL_ZONE_BASED_ON = 'fiscal_zone_based_on';
     public const VAT_FIELD = 'vat_field';
@@ -64,19 +65,18 @@ class SettingsService
         return (int) $this->get(self::DOCUMENT_SET_ID, '0');
     }
 
-    /**
-     * Whether to mark untaxed order lines as tax-exempt (applying the configured
-     * {@see exemptionReason()}). When off, lines without a VAT rate carry no
-     * exemption reason.
-     */
-    public function taxExemption(): bool
-    {
-        return (string) $this->get(self::TAX_EXEMPTION, '0') === '1';
-    }
-
     public function autoCreate(): bool
     {
         return (string) $this->get(self::AUTO_CREATE, '0') === '1';
+    }
+
+    /**
+     * Whether to e-mail the document to the customer after creating it. Only
+     * takes effect once the document is actually closed (see DocumentService).
+     */
+    public function sendEmail(): bool
+    {
+        return (string) $this->get(self::SEND_EMAIL, '0') === '1';
     }
 
     public function measurementUnitId(): int
@@ -90,7 +90,17 @@ class SettingsService
     }
 
     /**
-     * Moloni exemption reason code applied to lines with a 0% tax rate.
+     * Default Moloni payment method used when a WHMCS gateway cannot be matched
+     * to a payment method by name. 0 means none configured.
+     */
+    public function paymentMethodId(): int
+    {
+        return (int) $this->get(self::PAYMENT_METHOD_ID, '0');
+    }
+
+    /**
+     * Moloni exemption reason code automatically applied to any line that
+     * resolves to no VAT (a 0% / untaxed line).
      */
     public function exemptionReason(): string
     {

@@ -8,6 +8,7 @@ use Moloni\Facades\LoggerFacade;
 use Moloni\Models\Document;
 use Moloni\Models\Order;
 use Moloni\Models\Whmcs;
+use Moloni\Support\Paginator;
 
 /**
  * Provides the order/document lists shown in the UI and the discard/revert
@@ -16,11 +17,11 @@ use Moloni\Models\Whmcs;
 class OrderService
 {
     /**
-     * WHMCS orders that still need action (not synced, not discarded).
-     *
-     * @return array<int,object>
+     * WHMCS orders that still need action (not synced, not discarded), one page
+     * at a time. Filtering by tracking status happens in PHP, so the page is
+     * sliced from the assembled list rather than in SQL.
      */
-    public function getPendingOrders(): array
+    public function getPendingOrders(int $page = 1, int $perPage = Paginator::PER_PAGE): Paginator
     {
         $tracking = $this->trackingByOrderId();
         $pending = [];
@@ -37,28 +38,33 @@ class OrderService
             $pending[] = $order;
         }
 
-        return $pending;
+        return Paginator::fromSlice($pending, $page, $perPage);
     }
 
     /**
-     * Documents already created in Moloni ON.
-     *
-     * @return array<int,object>
+     * Documents already created in Moloni ON, one page at a time.
      */
-    public function getCreatedDocuments(): array
+    public function getCreatedDocuments(int $page = 1, int $perPage = Paginator::PER_PAGE): Paginator
     {
-        return Document::query()
-            ->orderByDesc('id')
-            ->get()
-            ->all();
+        return Paginator::paginate(
+            $page,
+            (int) Document::query()->count(),
+            $perPage,
+            static fn (int $offset, int $limit): array => Document::query()
+                ->orderByDesc('id')
+                ->offset($offset)
+                ->limit($limit)
+                ->get()
+                ->all()
+        );
     }
 
     /**
-     * Orders explicitly marked "do not sync".
-     *
-     * @return array<int,object>
+     * Orders explicitly marked "do not sync", one page at a time. The discard
+     * set is filtered against the recent-orders window in PHP, so the page is
+     * sliced from the assembled list.
      */
-    public function getDiscardedOrders(): array
+    public function getDiscardedOrders(int $page = 1, int $perPage = Paginator::PER_PAGE): Paginator
     {
         $discarded = Order::query()
             ->where('status', Order::STATUS_DISCARDED)
@@ -67,15 +73,17 @@ class OrderService
             ->all();
 
         if ($discarded === []) {
-            return [];
+            return Paginator::fromSlice([], $page, $perPage);
         }
 
         $lookup = array_flip($discarded);
 
-        return array_values(array_filter(
+        $orders = array_values(array_filter(
             Whmcs::ordersWithClients(),
             static fn ($order): bool => isset($lookup[(int) $order->id])
         ));
+
+        return Paginator::fromSlice($orders, $page, $perPage);
     }
 
     public function discardOrder(int $orderId): void

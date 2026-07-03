@@ -63,7 +63,7 @@ class ApiClient
             throw new ApiException('Invalid response from Moloni ON API.', ['raw' => $response]);
         }
 
-        $this->assertNoErrors($operation, $parsed);
+        $this->assertNoErrors($operation, $parsed, $variables);
 
         return $parsed;
     }
@@ -140,12 +140,13 @@ class ApiClient
 
     /**
      * @param array<string,mixed> $parsed
+     * @param array<string,mixed> $variables The data sent with the request.
      * @throws ApiException
      */
-    private function assertNoErrors(string $operation, array $parsed): void
+    private function assertNoErrors(string $operation, array $parsed, array $variables = []): void
     {
         if (!empty($parsed['errors'])) {
-            throw new ApiException('Moloni ON API error.', ['errors' => $parsed['errors']]);
+            throw new ApiException('Moloni ON API error.', ['errors' => $parsed['errors'], 'sent' => $variables]);
         }
 
         // Moloni returns validation/business errors in the per-operation
@@ -154,7 +155,10 @@ class ApiClient
         $operationErrors = $parsed['data'][$operation]['errors'] ?? [];
 
         if (!empty($operationErrors)) {
-            throw new ApiException('Moloni ON API rejected the request.', ['errors' => $operationErrors]);
+            throw new ApiException(
+                'Moloni ON API rejected the request.',
+                ['errors' => $operationErrors, 'sent' => $variables]
+            );
         }
     }
 

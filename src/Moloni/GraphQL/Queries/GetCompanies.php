@@ -21,6 +21,7 @@ class GetCompanies extends AbstractOperation
                 name
                 email
                 slug
+                img1
                 address
                 isConfirmed
                 zipCode

@@ -3,6 +3,7 @@
 
 .moloni-on {
     margin-bottom: 1rem;
+    font-size: 1rem;
 }
 
 .moloni-on__topbar {
@@ -29,11 +30,16 @@
 }
 
 .moloni-on__company {
-    font-size: 0.9rem;
+    font-size: 1.4rem;
     color: #6c757d;
 }
 
+/* Force a predictable flex layout regardless of the WHMCS admin theme's
+   Bootstrap version, so the tabs and the logout button share a baseline. */
 .moloni-on__nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
     margin-bottom: 1rem;
 }
 
@@ -45,16 +51,12 @@
     margin-left: auto;
 }
 
-/* Logout posts via a form; render its button like the sibling nav-link tabs. */
+/* Logout posts via a form; keep it inline with the tabs so its button
+   (styled via Bootstrap .btn classes) lines up on the tab baseline. */
 .moloni-on__nav-right .moloni-on__inline-form {
     display: flex;
-}
-
-.moloni-on__logout {
-    background: none;
-    border: 0;
-    cursor: pointer;
-    font: inherit;
+    align-items: center;
+    margin: 0;
 }
 
 .moloni-on__panel {
@@ -104,40 +106,134 @@
     display: inline;
 }
 
-.moloni-on__login,
-.moloni-on__company-select {
+.moloni-on__login {
     max-width: 520px;
     margin: 2rem auto;
 }
 
-.moloni-on__company-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+.moloni-on__company-select {
+    max-width: 820px;
+    margin: 2rem auto;
 }
 
-.moloni-on__company-item {
+.moloni-on__company-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.85rem;
+    margin-top: 1rem;
+}
+
+.moloni-on__company-card {
+    position: relative;
     display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    padding: 0.6rem 0.8rem;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.9rem 1rem;
     border: 1px solid #e3e7ee;
-    border-radius: 6px;
+    border-radius: 10px;
     cursor: pointer;
+    background: #fff;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.moloni-on__company-card:hover {
+    border-color: #b9c2d0;
+}
+
+/* Visually hide the native radio but keep it accessible/focusable. */
+.moloni-on__company-card > input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.moloni-on__company-card:has(input[type="radio"]:checked) {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2);
+}
+
+.moloni-on__company-card:has(input[type="radio"]:focus-visible) {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.35);
+}
+
+.moloni-on__company-logo {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f1f3f7;
+}
+
+.moloni-on__company-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.moloni-on__company-initial {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: #6c757d;
+}
+
+.moloni-on__company-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
 }
 
 .moloni-on__company-name {
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .moloni-on__company-meta {
     color: #6c757d;
     font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.moloni-on__company-check {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.7rem;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #cfd6e0;
+    border-radius: 50%;
+    background: #fff;
+}
+
+.moloni-on__company-card:has(input[type="radio"]:checked) .moloni-on__company-check {
+    border-color: #0d6efd;
+    background: #0d6efd;
+}
+
+.moloni-on__company-card:has(input[type="radio"]:checked) .moloni-on__company-check::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
 }
 
 .moloni-on__level {
     text-transform: uppercase;
-    font-size: 0.7rem;
+    font-size: 0.78rem;
 }
 
 .moloni-on__level--error,
@@ -190,8 +286,9 @@
 
 .moloni-on__overlay-dialog {
     width: 100%;
-    max-width: 640px;
-    max-height: 80vh;
+    max-width: 760px;
+    min-height: 50vh;
+    max-height: 85vh;
     display: flex;
     flex-direction: column;
     background: #fff;
@@ -210,7 +307,7 @@
 
 .moloni-on__overlay-head h4 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1.1rem;
 }
 
 .moloni-on__overlay-close {
@@ -225,20 +322,47 @@
 .moloni-on__overlay-body {
     margin: 0;
     padding: 1rem;
+    flex: 1 1 auto;
     overflow: auto;
     white-space: pre-wrap;
     word-break: break-word;
-    font-size: 0.85rem;
+    font-size: 1.2rem;
+}
+
+.moloni-on__overlay-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e5e7eb;
 }
 
 .moloni-on__footer {
     text-align: center;
     color: #8a94a6;
-    font-size: 0.8rem;
+    font-size: 1.2rem;
     padding: 0.5rem 0;
 }
 
-.moloni-on__help {
+.moloni-on__footer a {
+    color: #8a94a6;
+    text-decoration: underline;
+    margin-left: 0.35rem;
+}
+
+.moloni-on__pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     margin-top: 1rem;
-    font-size: 0.9rem;
+}
+
+.moloni-on__pagination-summary {
+    color: #8a94a6;
+    font-size: 1.2rem;
+}
+
+.moloni-on__pagination .pagination {
+    margin: 0;
 }

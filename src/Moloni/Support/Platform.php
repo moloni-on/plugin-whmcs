@@ -12,6 +12,9 @@ namespace Moloni\Support;
  */
 final class Platform
 {
+    /** Module version. Single source of truth; also used to cache-bust assets. */
+    public const VERSION = '1.0.0';
+
     /** GraphQL API base (also the OAuth grant/authorize host). */
     public const API_URL = 'https://api.molonion.pt/v1';
 
@@ -20,6 +23,9 @@ final class Platform
 
     /** Media API host (PDF downloads use a signed token against this host). */
     public const MEDIA_API_URL = 'https://mediaapi.moloni.org';
+
+    /** Public help/guides page (linked from the footer). */
+    public const HELP_URL = 'https://www.molonion.pt/help';
 
     /** Default request timeout, in seconds. */
     public const API_TIMEOUT = 45;

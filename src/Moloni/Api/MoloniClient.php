@@ -12,6 +12,7 @@ use Moloni\GraphQL\Mutations\CreateDocument;
 use Moloni\GraphQL\Mutations\CreatePaymentMethod;
 use Moloni\GraphQL\Mutations\CreateProduct;
 use Moloni\GraphQL\Mutations\CreateTax;
+use Moloni\GraphQL\Mutations\SendDocumentMail;
 use Moloni\GraphQL\Mutations\UpdateCustomer;
 use Moloni\GraphQL\Mutations\UpdateDocumentStatus;
 use Moloni\GraphQL\Queries\GetCompanies;
@@ -22,7 +23,9 @@ use Moloni\GraphQL\Queries\GetCustomers;
 use Moloni\GraphQL\Queries\GetDocument;
 use Moloni\GraphQL\Queries\GetDocumentPdfToken;
 use Moloni\GraphQL\Queries\GetDocumentSets;
+use Moloni\GraphQL\Queries\GetMeasurementUnits;
 use Moloni\GraphQL\Queries\GetPaymentMethods;
+use Moloni\GraphQL\Queries\GetProductCategories;
 use Moloni\GraphQL\Queries\GetProducts;
 use Moloni\GraphQL\Queries\GetTaxes;
 
@@ -66,6 +69,26 @@ class MoloniClient
     public function getDocumentSets(): array
     {
         return $this->run(new GetDocumentSets());
+    }
+
+    /**
+     * @return array<int,array<string,mixed>>
+     * @throws ApiException
+     */
+    public function getMeasurementUnits(): array
+    {
+        return $this->run(new GetMeasurementUnits());
+    }
+
+    /**
+     * Root product categories (those without a parent).
+     *
+     * @return array<int,array<string,mixed>>
+     * @throws ApiException
+     */
+    public function getProductCategories(): array
+    {
+        return $this->run(new GetProductCategories());
     }
 
     /**
@@ -127,6 +150,17 @@ class MoloniClient
      * @return array<string,mixed>|null
      * @throws ApiException
      */
+    /**
+     * All payment methods for the company (settings dropdown).
+     *
+     * @return array<int,array<string,mixed>>
+     * @throws ApiException
+     */
+    public function getPaymentMethods(): array
+    {
+        return $this->run(new GetPaymentMethods());
+    }
+
     public function findPaymentMethodByName(string $name): ?array
     {
         $methods = $this->run(new GetPaymentMethods(), ['name' => $name]);
@@ -241,6 +275,24 @@ class MoloniClient
         return $this->run(
             new UpdateDocumentStatus($documentType),
             ['documentId' => $documentId, 'status' => $status]
+        );
+    }
+
+    /**
+     * E-mail a document to a recipient.
+     *
+     * @return array<string,mixed>
+     * @throws ApiException
+     */
+    public function sendDocumentMail(
+        int $documentId,
+        string $name,
+        string $email,
+        string $documentType = DocumentType::INVOICE
+    ): array {
+        return $this->run(
+            new SendDocumentMail($documentType),
+            ['documentId' => $documentId, 'name' => $name, 'email' => $email]
         );
     }
 

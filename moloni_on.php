@@ -14,6 +14,7 @@ declare(strict_types=1);
 use Moloni\Admin\Container;
 use Moloni\Admin\Dispatcher;
 use Moloni\Database\Installer;
+use Moloni\Support\Platform;
 use WHMCS\Config\Setting;
 
 if (!defined('WHMCS')) {
@@ -32,7 +33,7 @@ function moloni_on_config(): array
     return [
         'name' => 'Moloni ON',
         'description' => 'Sync WHMCS orders into Moloni ON as invoices/documents.',
-        'version' => '1.0.0',
+        'version' => Platform::VERSION,
         'author' => 'Moloni',
         'language' => 'english',
         'fields' => [],

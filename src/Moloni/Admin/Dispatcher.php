@@ -15,6 +15,7 @@ use Moloni\Services\LogService;
 use Moloni\Support\Company;
 use Moloni\Support\Context;
 use Moloni\Support\Lang;
+use Moloni\Support\Platform;
 use Moloni\Support\Request;
 use Throwable;
 
@@ -32,7 +33,7 @@ class Dispatcher
     private const MODULE_PATH = 'addonmodules.php?module=' . self::MODULE_SLUG;
 
     /** Dashboard pages the router will render (keep in sync with pageData/pageTemplate). */
-    private const PAGES = ['orders', 'documents', 'config', 'tools', 'logs'];
+    private const PAGES = ['orders', 'documents', 'discarded', 'config', 'tools', 'logs'];
 
     private Container $container;
 
@@ -256,10 +257,12 @@ class Dispatcher
             $settings->set($settings::DOCUMENT_SET_ID, $this->request->post('document_set_id'));
         }
 
-        $settings->set($settings::TAX_EXEMPTION, $this->request->hasPost('tax_exemption') ? '1' : '0');
         $settings->set($settings::AUTO_CREATE, $this->request->hasPost('auto_create') ? '1' : '0');
+        $settings->set($settings::SEND_EMAIL, $this->request->hasPost('send_email') ? '1' : '0');
 
-        foreach ([$settings::MEASUREMENT_UNIT_ID, $settings::PRODUCT_CATEGORY_ID] as $key) {
+        $intKeys = [$settings::MEASUREMENT_UNIT_ID, $settings::PRODUCT_CATEGORY_ID, $settings::PAYMENT_METHOD_ID];
+
+        foreach ($intKeys as $key) {
             if ($this->request->hasPost($key)) {
                 $settings->set($key, (string) $this->request->postInt($key));
             }
@@ -326,7 +329,10 @@ class Dispatcher
     {
         $page = in_array($page, self::PAGES, true) ? $page : 'orders';
 
-        $data = $this->sharedData($page) + $this->pageData($page);
+        // Build page data first: it may queue flash messages (e.g. a document
+        // sets load failure) that sharedData() then snapshots for rendering.
+        $pageData = $this->pageData($page);
+        $data = $this->sharedData($page) + $pageData;
         $body = $this->container->template()->render($this->pageTemplate($page), $data);
 
         return $this->renderLayout($body, $data, true);
@@ -396,7 +402,11 @@ class Dispatcher
                 continue;
             }
 
-            $selectable[] = $company->getAll();
+            $row = $company->getAll();
+            $img = trim((string) ($row['img1'] ?? ''));
+            $row['logo'] = $img !== '' ? Platform::MEDIA_API_URL . $img : '';
+
+            $selectable[] = $row;
         }
 
         return $selectable;
@@ -409,26 +419,42 @@ class Dispatcher
     {
         switch ($page) {
             case 'orders':
+                $orders = $this->container->orders()->getPendingOrders($this->pageParam('page'));
+
                 return [
-                    'orders' => $this->container->orders()->getPendingOrders(),
+                    'orders' => $orders->items(),
+                    'ordersPagination' => $orders,
                     'documentTypes' => DocumentType::all(),
                 ];
 
             case 'documents':
+                $documents = $this->container->orders()->getCreatedDocuments($this->pageParam('page'));
+
                 return [
-                    'documents' => $this->container->orders()->getCreatedDocuments(),
-                    'discarded' => $this->container->orders()->getDiscardedOrders(),
+                    'documents' => $documents->items(),
+                    'documentsPagination' => $documents,
+                ];
+
+            case 'discarded':
+                $discarded = $this->container->orders()->getDiscardedOrders($this->pageParam('page'));
+
+                return [
+                    'discarded' => $discarded->items(),
+                    'discardedPagination' => $discarded,
                 ];
 
             case 'config':
-                return [
-                    'settings' => $this->container->settings()->all(),
-                    'documentTypes' => DocumentType::all(),
-                    'documentSets' => $this->safeDocumentSets(),
-                ];
+                return $this->configPageData();
 
             case 'logs':
-                return ['logs' => (new LogService())->getLogs($this->logFilters())];
+                $filters = $this->logFilters();
+                $logs = (new LogService())->getLogs($filters, $this->pageParam('page'));
+
+                return [
+                    'logs' => $logs->items(),
+                    'logsPagination' => $logs,
+                    'logFilters' => $filters,
+                ];
 
             default:
                 return [];
@@ -436,14 +462,64 @@ class Dispatcher
     }
 
     /**
+     * Read a 1-based page number from the query string, never below 1.
+     */
+    private function pageParam(string $key): int
+    {
+        return max(1, $this->request->queryInt($key, 1));
+    }
+
+    /**
+     * Config-page data. Each Moloni ON list is fetched defensively so a single
+     * failing lookup never blanks the whole page; the exemption reasons come
+     * from the already-loaded company payload.
+     *
+     * @return array<string,mixed>
+     */
+    private function configPageData(): array
+    {
+        $client = $this->container->moloniClient();
+        $company = Context::company();
+
+        return [
+            'settings' => $this->container->settings()->all(),
+            'documentTypes' => DocumentType::all(),
+            'documentSets' => $this->safeList(
+                'document sets',
+                [$client, 'getDocumentSets'],
+                'document_sets_unavailable'
+            ),
+            'measurementUnits' => $this->safeList('measurement units', [$client, 'getMeasurementUnits']),
+            'productCategories' => $this->safeList('product categories', [$client, 'getProductCategories']),
+            'paymentMethods' => $this->safeList('payment methods', [$client, 'getPaymentMethods']),
+            'exemptionReasons' => $company ? $company->getExemptionReasons() : [],
+        ];
+    }
+
+    /**
+     * Fetch a Moloni ON list, degrading to [] (and a log entry) on failure so
+     * the page still renders. When $userMessage is given, a warning alert is
+     * also shown to the admin.
+     *
+     * @param callable():array<int,array<string,mixed>> $fetch
      * @return array<int,array<string,mixed>>
      */
-    private function safeDocumentSets(): array
+    private function safeList(string $what, callable $fetch, ?string $userMessage = null): array
     {
         try {
-            return $this->container->moloniClient()->getDocumentSets();
+            return $fetch();
         } catch (Throwable $e) {
-            LoggerFacade::warning('Could not load document sets.', ['error' => $e->getMessage()]);
+            $context = ['error' => $e->getMessage()];
+
+            if ($e instanceof MoloniException) {
+                $context += $e->getData();
+            }
+
+            LoggerFacade::warning('Could not load ' . $what . '.', $context);
+
+            if ($userMessage !== null) {
+                $this->warning(Lang::get($userMessage));
+            }
 
             return [];
         }
@@ -526,5 +602,10 @@ class Dispatcher
     private function error(string $text): void
     {
         $this->messages[] = ['type' => 'danger', 'text' => $text];
+    }
+
+    private function warning(string $text): void
+    {
+        $this->messages[] = ['type' => 'warning', 'text' => $text];
     }
 }

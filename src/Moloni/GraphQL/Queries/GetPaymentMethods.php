@@ -7,7 +7,8 @@ namespace Moloni\GraphQL\Queries;
 use Moloni\GraphQL\AbstractOperation;
 
 /**
- * Searches payment methods by name to reuse one before creating it.
+ * Lists payment methods — the whole list (for the settings dropdown) or filtered
+ * by name to reuse one before creating it.
  */
 class GetPaymentMethods extends AbstractOperation
 {
@@ -29,22 +30,20 @@ class GetPaymentMethods extends AbstractOperation
     GRAPHQL;
 
     /**
+     * Pagination is always sent (the API rejects list queries without it); a
+     * name search is added only when one is provided.
+     *
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
     public function variables(array $data = []): array
     {
-        $variables = [];
+        $options = ['pagination' => ['page' => 1, 'qty' => 100]];
 
         if (!empty($data['name'])) {
-            $variables['options'] = [
-                'search' => [
-                    'field' => 'name',
-                    'value' => (string) $data['name'],
-                ],
-            ];
+            $options['search'] = ['field' => 'name', 'value' => (string) $data['name']];
         }
 
-        return $variables;
+        return ['options' => $options];
     }
 }
