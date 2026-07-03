@@ -14,6 +14,7 @@ declare(strict_types=1);
 use Moloni\Admin\Container;
 use Moloni\Admin\Dispatcher;
 use Moloni\Database\Installer;
+use WHMCS\Config\Setting;
 
 if (!defined('WHMCS')) {
     die('This file cannot be accessed directly');
@@ -75,7 +76,11 @@ function moloni_on_upgrade(array $vars): void
  */
 function moloni_on_output(array $vars): void
 {
-    $container = new Container(__DIR__ . '/templates', (string) ($vars['modulelink'] ?? ''));
+    $container = new Container(
+        __DIR__ . '/templates',
+        (string) ($vars['modulelink'] ?? ''),
+        (string) Setting::getValue('SystemURL')
+    );
     $dispatcher = new Dispatcher($container, $vars);
 
     echo $dispatcher->dispatch();

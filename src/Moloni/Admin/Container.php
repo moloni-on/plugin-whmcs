@@ -27,10 +27,13 @@ class Container
 
     private string $moduleLink;
 
-    public function __construct(string $templatePath, string $moduleLink)
+    private string $assetBase;
+
+    public function __construct(string $templatePath, string $moduleLink, string $assetBase = '')
     {
         $this->templatePath = $templatePath;
         $this->moduleLink = $moduleLink;
+        $this->assetBase = $assetBase;
     }
 
     public function apiClient(): ApiClient
@@ -68,7 +71,11 @@ class Container
 
     public function template(): Template
     {
-        return $this->instances[Template::class] ??= new Template($this->templatePath, $this->moduleLink);
+        return $this->instances[Template::class] ??= new Template(
+            $this->templatePath,
+            $this->moduleLink,
+            $this->assetBase
+        );
     }
 
     public function moduleLink(): string

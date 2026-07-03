@@ -16,10 +16,13 @@ final class Template
 
     private string $moduleLink;
 
-    public function __construct(string $basePath, string $moduleLink)
+    private string $assetBase;
+
+    public function __construct(string $basePath, string $moduleLink, string $assetBase = '')
     {
         $this->basePath = rtrim($basePath, '/');
         $this->moduleLink = $moduleLink;
+        $this->assetBase = rtrim($assetBase, '/');
     }
 
     /**
@@ -66,7 +69,12 @@ final class Template
 
     public function asset(string $path): string
     {
-        return 'modules/addons/moloni_on/public/' . ltrim($path, '/');
+        $relative = 'modules/addons/moloni_on/public/' . ltrim($path, '/');
+
+        // Admin pages are served from /admin/, but addon assets live at the web
+        // root, so a relative path would 404 under /admin/. Prepend the WHMCS
+        // system URL when available to produce an absolute URL.
+        return $this->assetBase !== '' ? $this->assetBase . '/' . $relative : $relative;
     }
 
     public function partial(string $template, array $data = []): void
