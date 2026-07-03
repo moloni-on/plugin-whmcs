@@ -409,11 +409,12 @@ class DocumentService
      */
     private function fiscalZone(): array
     {
-        $company = Context::$company;
+        $company = Context::company();
+        $fiscalZone = $company !== null ? $company->get('fiscalZone') : null;
 
         return [
-            'code' => (string) ($company['fiscalZone']['fiscalZone'] ?? 'PT'),
-            'countryId' => (int) ($company['country']['countryId'] ?? 0),
+            'code' => (string) ($fiscalZone['fiscalZone'] ?? 'PT'),
+            'countryId' => $company !== null ? $company->getCountry() : 0,
         ];
     }
 

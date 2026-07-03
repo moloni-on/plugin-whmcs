@@ -11,6 +11,7 @@ use Moloni\Exceptions\MoloniException;
 use Moloni\Facades\LoggerFacade;
 use Moloni\Models\Order;
 use Moloni\Services\LogService;
+use Moloni\Support\Company;
 use Moloni\Support\Context;
 use Moloni\Support\Lang;
 use Throwable;
@@ -291,7 +292,7 @@ class Dispatcher
     private function renderCompanySelect(): string
     {
         try {
-            $companies = $this->container->moloniClient()->getCompanies();
+            $companies = $this->filterSelectableCompanies($this->container->moloniClient()->getCompanies());
         } catch (Throwable $e) {
             $companies = [];
             $this->error($e->getMessage());
@@ -304,6 +305,30 @@ class Dispatcher
             . $tpl->render('Blocks/messages', $data)
             . $tpl->render('company', $data)
             . $tpl->render('Blocks/footer', $data);
+    }
+
+    /**
+     * Keep only companies the user can actually connect: confirmed and with the
+     * API client add-on purchased (feature-gated via the company's permissions).
+     *
+     * @param array<int,array<string,mixed>> $companies
+     * @return array<int,array<string,mixed>>
+     */
+    private function filterSelectableCompanies(array $companies): array
+    {
+        $selectable = [];
+
+        foreach ($companies as $row) {
+            $company = new Company($row);
+
+            if ($company->getCompanyId() <= 0 || !$company->get('isConfirmed') || !$company->hasApiClient()) {
+                continue;
+            }
+
+            $selectable[] = $company->getAll();
+        }
+
+        return $selectable;
     }
 
     /**
@@ -379,7 +404,7 @@ class Dispatcher
         return [
             'activeTab' => $activeTab,
             'messages' => $this->messages,
-            'company' => Context::$company,
+            'company' => Context::company() ? Context::company()->getAll() : [],
             'moduleLink' => $this->moduleLink,
             'orderStatuses' => [Order::STATUS_PENDING, Order::STATUS_FAILED],
         ];

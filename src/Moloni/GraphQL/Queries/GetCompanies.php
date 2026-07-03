@@ -30,6 +30,10 @@ class GetCompanies extends AbstractOperation
                     countryId
                     title
                 }
+                limits {
+                    moduleId
+                    active
+                }
             }
             errors {
                 field

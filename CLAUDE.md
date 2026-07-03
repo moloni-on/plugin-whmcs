@@ -35,7 +35,7 @@ Templates (UI)  →  moloni_on.php (output) / hooks.php
 - **Api** (`src/Moloni/Api/`): `ApiClient` (native-cURL HTTP: OAuth grant/refresh + GraphQL), `MoloniClient` (domain wrapper)
 - **GraphQL** (`src/Moloni/GraphQL/`): one class per query/mutation extending `AbstractOperation`; GraphQL string in the `QUERY` constant, plus `operation()` + `variables($data)`
 - **Models** (`src/Moloni/Models/`): `Order`, `Document`, `Config`, `Log`, `Auth` (extend `AbstractModel`); `Whmcs` reads native WHMCS tables
-- **Support** (`src/Moloni/Support/`): `Platform` (endpoints), `Context` (per-request session/token), `Lang` (i18n), `Template` (renderer)
+- **Support** (`src/Moloni/Support/`): `Platform` (endpoints), `Context` (per-request session/token/company), `Company` (company payload + feature permissions via `limits`), `Lang` (i18n), `Template` (renderer)
 - **Enums** (`src/Moloni/Enums/`): `DocumentType`, `DocumentStatus`, `ProductType`, `ProductTypeAT`, `TaxType`, `TaxFiscalZoneType`
 - **Facades** (`src/Moloni/Facades/`): `LoggerFacade`
 - **Exceptions** (`src/Moloni/Exceptions/`): `MoloniException` base → `ApiException`, `DocumentException`, `AuthException`, `ValidationException`

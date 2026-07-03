@@ -19,8 +19,8 @@ final class Context
 
     public static int $companyId = 0;
 
-    /** @var array<string,mixed> */
-    public static array $company = [];
+    /** The selected company payload + permissions, loaded once per request. */
+    public static ?Company $company = null;
 
     private function __construct()
     {
@@ -31,7 +31,20 @@ final class Context
         self::$sessionId = null;
         self::$accessToken = '';
         self::$companyId = 0;
-        self::$company = [];
+        self::$company = null;
+    }
+
+    /**
+     * The loaded company (permissions/fiscal data), or null before selection.
+     */
+    public static function company(): ?Company
+    {
+        return self::$company;
+    }
+
+    public static function setCompany(array $company): void
+    {
+        self::$company = new Company($company);
     }
 
     public static function hasCompany(): bool

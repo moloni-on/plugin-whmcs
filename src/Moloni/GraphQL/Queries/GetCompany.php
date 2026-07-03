@@ -36,6 +36,10 @@ class GetCompany extends AbstractOperation
                     currencyId
                     iso4217
                 }
+                limits {
+                    moduleId
+                    active
+                }
             }
             options {
                 defaultLanguageId

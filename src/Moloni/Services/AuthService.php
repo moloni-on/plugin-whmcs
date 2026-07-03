@@ -149,9 +149,9 @@ class AuthService
         }
 
         try {
-            Context::$company = $this->client->getCompany(Context::$companyId);
+            Context::setCompany($this->client->getCompany(Context::$companyId));
         } catch (ApiException $e) {
-            Context::$company = [];
+            Context::setCompany([]);
             LoggerFacade::warning('Could not load company details.', ['error' => $e->getMessage()]);
         }
     }
