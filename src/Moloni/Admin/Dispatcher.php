@@ -95,8 +95,9 @@ class Dispatcher
                 return $companyPage;
             }
 
-            // 4. Logout.
-            if ($action === 'logout') {
+            // 4. Logout. Keyed on the POST op so it inherits the CSRF check
+            // above; a forged GET can no longer tear down the session.
+            if ($op === 'logout') {
                 $this->container->auth()->logout();
 
                 return $this->renderStandalone('login');

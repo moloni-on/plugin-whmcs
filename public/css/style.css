@@ -45,6 +45,18 @@
     margin-left: auto;
 }
 
+/* Logout posts via a form; render its button like the sibling nav-link tabs. */
+.moloni-on__nav-right .moloni-on__inline-form {
+    display: flex;
+}
+
+.moloni-on__logout {
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+}
+
 .moloni-on__panel {
     background: #fff;
     border: 1px solid #e3e7ee;

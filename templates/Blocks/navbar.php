@@ -5,6 +5,7 @@
  * @var callable $lang
  * @var callable $url
  * @var callable $e
+ * @var callable $postForm
  * @var string $activeTab
  */
 $tabs = [
@@ -24,6 +25,6 @@ $tabs = [
         </li>
     <?php endforeach; ?>
     <li class="nav-item ms-auto moloni-on__nav-right">
-        <a class="nav-link" href="<?= $e($url(['action' => 'logout'])) ?>"><?= $e($lang('nav_logout')) ?></a>
+        <?= $postForm(['op' => 'logout'], $lang('nav_logout'), ['class' => 'nav-link moloni-on__logout']) ?>
     </li>
 </ul>

@@ -86,7 +86,10 @@ class ApiClient
         $parsed = $this->grantRequest($fields);
 
         if (!isset($parsed['accessToken'], $parsed['refreshToken'])) {
-            throw new AuthException('Invalid credentials or authorization code.', ['response' => $parsed]);
+            throw new AuthException(
+                'Invalid credentials or authorization code.',
+                ['response' => $this->redactSecrets($parsed)]
+            );
         }
 
         return $parsed;
@@ -174,10 +177,29 @@ class ApiClient
         }
 
         if (isset($parsed['error'])) {
-            throw new ApiException('Moloni ON auth error.', ['response' => $parsed]);
+            throw new ApiException('Moloni ON auth error.', ['response' => $this->redactSecrets($parsed)]);
         }
 
         return $parsed;
+    }
+
+    /**
+     * Strip token/secret fields from a decoded auth response so they can never
+     * leak into exception context — and therefore into logs — if the context
+     * is ever recorded.
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    private function redactSecrets(array $data): array
+    {
+        foreach (['accessToken', 'refreshToken', 'clientSecret', 'apiClientId', 'code'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $data[$key] = '[redacted]';
+            }
+        }
+
+        return $data;
     }
 
     /**
