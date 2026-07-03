@@ -262,7 +262,7 @@ returns the root field name (used to locate `data`/`errors` in the response) and
 
 ```
 /src/Moloni/GraphQL/
-├── Queries/    GetMe, GetCompanies, GetCompany, GetCustomers, GetDocument,
+├── Queries/    GetCompanies, GetCompany, GetCustomers, GetDocument,
 │               GetDocumentSets, GetCountries, GetProducts, GetTaxes, ...
 └── Mutations/  CreateCustomer, CreateDocument, UpdateDocumentStatus,
                 CreateProduct, CreateTax
@@ -274,12 +274,12 @@ namespace Moloni\GraphQL\Queries;
 
 use Moloni\GraphQL\AbstractOperation;
 
-class GetMe extends AbstractOperation
+class GetCountries extends AbstractOperation
 {
-    protected const OPERATION = 'me';
+    protected const OPERATION = 'countries';
 
     protected const QUERY = <<<'GRAPHQL'
-    query { me { data { userCompanies { company { companyId } } } errors { field msg } } }
+    query countries($options: CountryOptions) { countries(options: $options) { data { countryId iso3166_1 } errors { field msg } } }
     GRAPHQL;
 }
 ```

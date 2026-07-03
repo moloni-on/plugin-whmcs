@@ -181,6 +181,41 @@ class ApiClient
     }
 
     /**
+     * Download a binary resource (e.g. a document PDF) from a media URL.
+     *
+     * @throws ApiException
+     */
+    public function download(string $url): string
+    {
+        $ch = curl_init($url);
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $this->timeout,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+
+        $content = curl_exec($ch);
+        $error = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($content === false) {
+            throw new ApiException('Could not download file from Moloni ON: ' . $error);
+        }
+
+        if ($status >= 400) {
+            throw new ApiException('Moloni ON media API returned HTTP ' . $status . '.');
+        }
+
+        // A successful-but-empty body ('') is passed through as-is: whether an
+        // empty payload is an error depends on the resource, so that check is
+        // deliberately left to the caller (e.g. DocumentService::downloadPdf).
+        return (string) $content;
+    }
+
+    /**
      * @param array<int,string> $headers
      * @throws ApiException
      */

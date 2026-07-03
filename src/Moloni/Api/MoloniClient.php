@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Moloni\Api;
 
+use Moloni\Enums\DocumentType;
 use Moloni\Exceptions\ApiException;
 use Moloni\GraphQL\AbstractOperation;
 use Moloni\GraphQL\Mutations\CreateCustomer;
@@ -21,7 +22,6 @@ use Moloni\GraphQL\Queries\GetCustomers;
 use Moloni\GraphQL\Queries\GetDocument;
 use Moloni\GraphQL\Queries\GetDocumentPdfToken;
 use Moloni\GraphQL\Queries\GetDocumentSets;
-use Moloni\GraphQL\Queries\GetMe;
 use Moloni\GraphQL\Queries\GetPaymentMethods;
 use Moloni\GraphQL\Queries\GetProducts;
 use Moloni\GraphQL\Queries\GetTaxes;
@@ -39,15 +39,6 @@ class MoloniClient
     public function __construct(ApiClient $api)
     {
         $this->api = $api;
-    }
-
-    /**
-     * @return array<string,mixed>
-     * @throws ApiException
-     */
-    public function getMe(): array
-    {
-        return $this->run(new GetMe());
     }
 
     /**
@@ -166,9 +157,7 @@ class MoloniClient
      */
     public function getCustomerNextNumber(): ?string
     {
-        $op = new GetCustomerNextNumber();
-        $response = $this->api->request($op->operation(), $op->query(), $op->variables());
-        $value = $response['data'][$op->operation()]['data'] ?? null;
+        $value = $this->dataNode(new GetCustomerNextNumber());
 
         return $value === null ? null : (string) $value;
     }
@@ -235,7 +224,7 @@ class MoloniClient
      * @return array<string,mixed>
      * @throws ApiException
      */
-    public function createDocument(array $data, string $documentType = 'invoice'): array
+    public function createDocument(array $data, string $documentType = DocumentType::INVOICE): array
     {
         return $this->run(new CreateDocument($documentType), $data);
     }
@@ -244,8 +233,11 @@ class MoloniClient
      * @return array<string,mixed>
      * @throws ApiException
      */
-    public function updateDocumentStatus(int $documentId, int $status, string $documentType = 'invoice'): array
-    {
+    public function updateDocumentStatus(
+        int $documentId,
+        int $status,
+        string $documentType = DocumentType::INVOICE
+    ): array {
         return $this->run(
             new UpdateDocumentStatus($documentType),
             ['documentId' => $documentId, 'status' => $status]
@@ -267,13 +259,24 @@ class MoloniClient
      * @return array<string,mixed>
      * @throws ApiException
      */
-    public function getDocumentPdfToken(int $documentId, string $documentType = 'invoice'): array
+    public function getDocumentPdfToken(int $documentId, string $documentType = DocumentType::INVOICE): array
     {
         return $this->run(new GetDocumentPdfToken($documentType), ['documentId' => $documentId]);
     }
 
     /**
-     * Execute an operation and return its unwrapped `data` node.
+     * Download a binary resource (e.g. a PDF) from a Moloni media URL.
+     *
+     * @throws ApiException
+     */
+    public function downloadMedia(string $url): string
+    {
+        return $this->api->download($url);
+    }
+
+    /**
+     * Execute an operation and return its unwrapped `data` node as an array
+     * ([] when absent or scalar).
      *
      * @param array<string,mixed> $input
      * @return array<string,mixed>
@@ -281,12 +284,27 @@ class MoloniClient
      */
     private function run(AbstractOperation $operation, array $input = []): array
     {
+        $data = $this->dataNode($operation, $input);
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Execute an operation and return its raw unwrapped `data` node (of any
+     * type), or null when absent. The sole place that knows the envelope shape.
+     *
+     * @param array<string,mixed> $input
+     * @return mixed
+     * @throws ApiException
+     */
+    private function dataNode(AbstractOperation $operation, array $input = [])
+    {
         $response = $this->api->request(
             $operation->operation(),
             $operation->query(),
             $operation->variables($input)
         );
 
-        return $response['data'][$operation->operation()]['data'] ?? [];
+        return $response['data'][$operation->operation()]['data'] ?? null;
     }
 }

@@ -166,7 +166,7 @@ class DocumentService {
     }
     
     public function downloadPdf($docId) {
-        // Fetch PDF from Moloni ON (on-demand)
+        // Resolve a media token, then fetch the PDF via MoloniClient::downloadMedia()
     }
 }
 ```
@@ -252,6 +252,9 @@ class ApiClient {
     public function authorizeUrl(string $clientId, string $redirectUri): string {}
     public function grant(string $clientId, string $clientSecret, string $code): array {}   // code -> tokens
     public function refresh(string $clientId, string $clientSecret, string $refreshToken): ?array {}
+
+    // Binary GET for media (e.g. document PDFs); shares the cURL/SSL setup.
+    public function download(string $url): string {}
 }
 ```
 
@@ -260,7 +263,6 @@ class ApiClient {
 class MoloniClient {
     public function __construct(ApiClient $apiClient) {}
 
-    public function getMe(): array {}
     public function getCompanies(): array {}
     public function getCompany(int $companyId): array {}
     public function getDocumentSets(): array {}
@@ -278,6 +280,8 @@ class MoloniClient {
     public function createProduct(array $data): array {}
     public function findTax(float $rate, string $fiscalZoneCode): ?array {}
     public function createTax(array $data): array {}
+
+    public function downloadMedia(string $url): string {}   // delegates to ApiClient::download()
 }
 ```
 

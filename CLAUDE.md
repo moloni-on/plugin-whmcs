@@ -32,10 +32,10 @@ Templates (UI)  →  moloni_on.php (output) / hooks.php
 
 - **Admin** (`src/Moloni/Admin/`): `Dispatcher` (front controller: OAuth flow + action routing + rendering), `Container` (lazy service factory)
 - **Services** (`src/Moloni/Services/`): `DocumentService` (assembles the `<Type>Insert`), `OrderService`, `LogService`, `SettingsService`, `AuthService`, `CountryResolver` (ISO2 → Moloni country/language), `CustomerResolver` (find by VAT/e-mail → create, else always update; VAT from a client custom field falling back to tax_id), `ProductResolver` (find-by-reference or create product per line), `TaxResolver` (find/create VAT tax by the order's rate + fiscal zone), `LineMapper` (WHMCS line type → reference/name/summary/discount; folds promo lines into a discount %), `PaymentResolver` (WHMCS gateway → Moloni payment method + payment line)
-- **Api** (`src/Moloni/Api/`): `ApiClient` (native-cURL HTTP: OAuth grant/refresh + GraphQL), `MoloniClient` (domain wrapper)
+- **Api** (`src/Moloni/Api/`): `ApiClient` (native-cURL HTTP: OAuth grant/refresh + GraphQL + `download()` for media/PDFs), `MoloniClient` (domain wrapper; `downloadMedia()` delegates to `ApiClient::download()`)
 - **GraphQL** (`src/Moloni/GraphQL/`): one class per query/mutation extending `AbstractOperation`; GraphQL string in the `QUERY` constant, plus `operation()` + `variables($data)`
 - **Models** (`src/Moloni/Models/`): `Order`, `Document`, `Config`, `Log`, `Auth` (extend `AbstractModel`); `Whmcs` reads native WHMCS tables
-- **Support** (`src/Moloni/Support/`): `Platform` (endpoints), `Context` (per-request session/token/company), `Company` (company payload + feature permissions via `limits`), `Lang` (i18n), `Template` (renderer)
+- **Support** (`src/Moloni/Support/`): `Platform` (endpoints), `Context` (per-request session/token/company), `Company` (company payload + feature permissions via `limits`), `Lang` (i18n), `Template` (renderer), `Request` (typed view over the request superglobals, keeps `Dispatcher` testable), `FiscalZone` (code + countryId value object; centralises the `PT`/upper-case defaults), `LineInput` (billing fields of one document line: name/price/reference/summary/discount)
 - **Enums** (`src/Moloni/Enums/`): `DocumentType`, `DocumentStatus`, `ProductType`, `ProductTypeAT`, `TaxType`, `TaxFiscalZoneType`
 - **Facades** (`src/Moloni/Facades/`): `LoggerFacade`
 - **Exceptions** (`src/Moloni/Exceptions/`): `MoloniException` base → `ApiException`, `DocumentException`, `AuthException`, `ValidationException`, `SkippedException` (order intentionally not billed, e.g. mass-payment invoice)
@@ -44,7 +44,7 @@ Templates (UI)  →  moloni_on.php (output) / hooks.php
 
 Created by `src/Moloni/Database/Installer.php` on module activation.
 
-- `mod_moloni_on_config` — key-value settings (document_type, document_status, document_set_id, tax_exemption, auto_create, measurement_unit_id, product_category_id, exemption_reason, fiscal_zone_based_on [company|billing], vat_field [client custom-field name for VAT]). Document-line VAT is derived from each WHMCS order's tax rate via `TaxResolver`, not stored here.
+- `mod_moloni_on_config` — key-value settings (document_type, document_status, document_set_id, tax_exemption, auto_create, measurement_unit_id, product_category_id, exemption_reason, fiscal_zone_based_on [company|billing], vat_field [client custom-field name for VAT]). Document-line VAT is derived from each WHMCS order's tax rate via `TaxResolver`, not stored here. When `tax_exemption` is on, lines that resolve to no VAT carry the configured `exemption_reason`; when off, untaxed lines carry no exemption reason.
 - `mod_moloni_on_auth` — single-row OAuth2 session (client_id, client_secret, access_token, refresh_token, expiries, company_id)
 - `mod_moloni_on_orders` — order sync tracking (order_id, moloni_document_id, status, …)
 - `mod_moloni_on_logs` — application logs (level, message, context, order_id, timestamp)
@@ -79,6 +79,17 @@ cover framework-independent classes (enums, Lang, GraphQL operations).
 
 ## Workflow notes
 
+**Documentation is part of "done" — never merge a behaviour change without it.**
+
+- **Always update the docs in the same change that creates or alters a behaviour.** Any
+  change to structure, schema, data flow, config keys, services/classes, or module
+  behaviour MUST update the affected planning docs ([CLAUDE.md](CLAUDE.md),
+  [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [SETUP.md](SETUP.md)) in the
+  same commit — keep them in sync, don't defer it. Pure internal refactors with no
+  observable change still get a journal entry (below).
+- **Always write a journal entry** as a new `.claude/journal/NNN_*.md` (next sequential
+  number, `# YYYY-MM-DD — <title>` heading). This is mandatory for big changes
+  (new features, refactors, schema/flow changes, dependency or auth changes); record what
+  changed, why, and any decisions or things deliberately left undone. Journal entries are
+  append-only history — add a new one, never rewrite past entries.
 - Track progress against phases in [.claude/PROJECT_PLAN.md](.claude/PROJECT_PLAN.md).
-- Record decisions/progress as new `.claude/journal/NNN_*.md` entries.
-- Keep the four planning docs in sync when schema, structure, or flow changes.

@@ -17,6 +17,8 @@ use Moloni\Models\Document;
 use Moloni\Models\Order;
 use Moloni\Models\Whmcs;
 use Moloni\Support\Context;
+use Moloni\Support\FiscalZone;
+use Moloni\Support\LineInput;
 use Moloni\Support\Platform;
 use Throwable;
 
@@ -30,6 +32,16 @@ use Throwable;
  */
 class DocumentService
 {
+    /** Largest difference (in currency units) still treated as an exact total match. */
+    private const MONETARY_EPSILON = 0.01;
+
+    /** Synthetic line used when an order has no invoice items to map. */
+    private const ORDER_TOTAL_LINE_NAME = 'Order total';
+    private const ORDER_TOTAL_REFERENCE = 'WHMCS-ORDER-TOTAL';
+
+    /** Fallback name for an invoice item that carries neither a mapped name nor a description. */
+    private const FALLBACK_LINE_NAME = 'Item';
+
     private MoloniClient $client;
 
     private SettingsService $settings;
@@ -82,80 +94,20 @@ class DocumentService
             $invoice = $order->invoiceid ? Whmcs::getInvoice((int) $order->invoiceid) : null;
             $items = $order->invoiceid ? Whmcs::getInvoiceItems((int) $order->invoiceid) : [];
 
-            // A WHMCS mass-payment invoice only bundles other invoices together;
-            // those are billed on their own, so there is nothing to invoice here.
-            if ($this->isMassPayment($items)) {
-                Order::setStatus($orderId, Order::STATUS_DISCARDED);
-                LoggerFacade::info(
-                    'Order skipped: mass-payment invoice that only aggregates other invoices.',
-                    ['order_id' => $orderId],
-                    $orderId
-                );
+            $this->guardAgainstMassPayment($orderId, $items);
 
-                throw new SkippedException('Mass-payment invoice; no document created.', ['order_id' => $orderId]);
-            }
+            $payload = $this->buildDocumentPayload($order, $invoice, $items, $documentType);
+            $document = $this->submitAndReconcile($payload, $order, $documentType);
 
-            $client = $order->userid ? Whmcs::getClient((int) $order->userid) : null;
-            $customerId = $this->customers->resolve($client);
-
-            $fiscalZone = $this->resolveFiscalZone($client);
-            $reference = '#' . ($order->ordernum ?: $order->id);
-            $now = date('Y-m-d H:i:s');
-            $wantedStatus = $this->settings->documentStatus();
-
-            $payload = [
-                'customerId' => $customerId,
-                'documentSetId' => $this->settings->documentSetId(),
-                'fiscalZone' => $fiscalZone['code'],
-                'date' => $now,
-                'expirationDate' => $now,
-                // Always create as draft; the document is only closed afterwards
-                // once we've confirmed Moloni's total matches the order total.
-                'status' => DocumentStatus::DRAFT,
-                'ourReference' => $reference,
-                'yourReference' => $reference,
-                'products' => $this->resolveProductLines(
-                    $items,
-                    (float) $order->amount,
-                    $invoice,
-                    $fiscalZone,
-                    (int) $order->invoiceid
-                ),
-            ];
-
-            $payments = $this->resolvePayments($order, $documentType);
-
-            if ($payments !== []) {
-                $payload['payments'] = $payments;
-            }
-
-            $result = $this->client->createDocument($payload, $documentType);
-            $documentId = (int) ($result['documentId'] ?? 0);
-
-            if ($documentId <= 0) {
-                throw new DocumentException('Moloni ON did not return a document id.', ['order_id' => $orderId]);
-            }
-
-            $orderTotal = (float) $order->amount;
-            $documentTotal = (float) ($result['documentTotal'] ?? $orderTotal);
-            $status = $this->closeIfRequested(
-                $documentId,
-                $documentType,
-                $wantedStatus,
-                $orderTotal,
-                $documentTotal,
-                $orderId
-            );
-
-            $this->persist($order, $documentId, $documentTotal, $documentType, $status);
+            $this->persist($order, $document['id'], $document['total'], $documentType, $document['status']);
 
             LoggerFacade::info('Document created.', [
                 'order_id' => $orderId,
-                'document_id' => $documentId,
-                'status' => $status,
+                'document_id' => $document['id'],
+                'status' => $document['status'],
             ], $orderId);
 
-            return $documentId;
+            return $document['id'];
         } catch (SkippedException $e) {
             // Not a failure: the order was intentionally skipped (and already
             // marked discarded + logged above). Let it propagate as-is.
@@ -174,6 +126,102 @@ class DocumentService
 
             throw new DocumentException($e->getMessage(), $data, 0, $e);
         }
+    }
+
+    /**
+     * A WHMCS mass-payment invoice only bundles other invoices together; those
+     * are billed on their own, so there is nothing to invoice here. Mark the
+     * order discarded and skip it.
+     *
+     * @param array<int,object> $items tblinvoiceitems rows
+     * @throws SkippedException when the invoice is a mass payment
+     */
+    private function guardAgainstMassPayment(int $orderId, array $items): void
+    {
+        if (!$this->isMassPayment($items)) {
+            return;
+        }
+
+        Order::setStatus($orderId, Order::STATUS_DISCARDED);
+        LoggerFacade::info(
+            'Order skipped: mass-payment invoice that only aggregates other invoices.',
+            ['order_id' => $orderId],
+            $orderId
+        );
+
+        throw new SkippedException('Mass-payment invoice; no document created.', ['order_id' => $orderId]);
+    }
+
+    /**
+     * Assemble the `<Type>Insert` payload for a WHMCS order: customer, fiscal
+     * zone, references, product lines and (when the type carries them) payments.
+     *
+     * @param object $order tblorders row
+     * @param object|null $invoice tblinvoices row
+     * @param array<int,object> $items tblinvoiceitems rows
+     * @return array<string,mixed>
+     * @throws ApiException
+     */
+    private function buildDocumentPayload($order, $invoice, array $items, string $documentType): array
+    {
+        $client = $order->userid ? Whmcs::getClient((int) $order->userid) : null;
+        $fiscalZone = $this->resolveFiscalZone($client);
+        $reference = '#' . ($order->ordernum ?: $order->id);
+        $now = date('Y-m-d H:i:s');
+
+        $payload = [
+            'customerId' => $this->customers->resolve($client),
+            'documentSetId' => $this->settings->documentSetId(),
+            'fiscalZone' => $fiscalZone->code(),
+            'date' => $now,
+            'expirationDate' => $now,
+            // Always create as draft; the document is only closed afterwards
+            // once we've confirmed Moloni's total matches the order total.
+            'status' => DocumentStatus::DRAFT,
+            'ourReference' => $reference,
+            'yourReference' => $reference,
+            'products' => $this->resolveProductLines(
+                $items,
+                (float) $order->amount,
+                $invoice,
+                $fiscalZone,
+                (int) $order->invoiceid
+            ),
+        ];
+
+        $payments = $this->resolvePayments($order, $documentType);
+
+        if ($payments !== []) {
+            $payload['payments'] = $payments;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Create the document in Moloni ON, then close it when the totals match the
+     * order (see {@see closeIfRequested()}).
+     *
+     * @param array<string,mixed> $payload
+     * @param object $order tblorders row
+     * @return array{id:int,total:float,status:int}
+     * @throws ApiException|DocumentException
+     */
+    private function submitAndReconcile(array $payload, $order, string $documentType): array
+    {
+        $orderId = (int) $order->id;
+        $result = $this->client->createDocument($payload, $documentType);
+        $documentId = (int) ($result['documentId'] ?? 0);
+
+        if ($documentId <= 0) {
+            throw new DocumentException('Moloni ON did not return a document id.', ['order_id' => $orderId]);
+        }
+
+        $orderTotal = (float) $order->amount;
+        $documentTotal = (float) ($result['documentTotal'] ?? $orderTotal);
+        $status = $this->closeIfRequested($documentId, $documentType, $orderTotal, $documentTotal, $orderId);
+
+        return ['id' => $documentId, 'total' => $documentTotal, 'status' => $status];
     }
 
     /**
@@ -246,7 +294,12 @@ class DocumentService
         }
 
         $url = Platform::MEDIA_API_URL . $token['path'] . '?jwt=' . $token['token'];
-        $content = $this->fetch($url);
+
+        try {
+            $content = $this->client->downloadMedia($url);
+        } catch (ApiException $e) {
+            throw new DocumentException($e->getMessage(), $e->getData(), 0, $e);
+        }
 
         if ($content === '') {
             throw new DocumentException('Empty PDF received from Moloni ON.', ['document_id' => $documentId]);
@@ -296,7 +349,6 @@ class DocumentService
      *
      * @param array<int,object> $items tblinvoiceitems rows
      * @param object|null $invoice tblinvoices row (for taxrate/taxrate2)
-     * @param array{code:string,countryId:int} $fiscalZone
      * @return array<int,array<string,mixed>>
      * @throws ApiException
      */
@@ -304,18 +356,13 @@ class DocumentService
         array $items,
         float $orderTotal,
         $invoice,
-        array $fiscalZone,
+        FiscalZone $fiscalZone,
         int $invoiceId
     ): array {
         $rates = $this->invoiceTaxRates($invoice);
 
         if ($items === []) {
-            // $orderTotal (tblorders.amount) is tax-inclusive, but Moloni adds
-            // VAT on top of the line price, so send the net amount to avoid
-            // double-taxing (mirrors the net per-item amounts below).
-            $price = $this->netAmount($orderTotal, $rates);
-
-            return [$this->buildLine('Order total', $price, $rates, $fiscalZone, 1, 'WHMCS-ORDER-TOTAL')];
+            return [$this->singleOrderTotalLine($orderTotal, $rates, $fiscalZone)];
         }
 
         $lines = [];
@@ -331,47 +378,52 @@ class DocumentService
                 continue;
             }
 
-            $name = $meta['name'] !== '' ? $meta['name'] : (string) ($item->description ?? 'Item');
-            $reference = $meta['reference'] !== '' ? $meta['reference'] : null;
-            $price = (float) ($item->amount ?? 0);
-            // Only taxed lines get VAT; untaxed lines are exempt.
-            $lineRates = ((int) ($item->taxed ?? 0)) === 1 ? $rates : [];
-
-            $lines[] = $this->buildLine(
-                $name,
-                $price,
-                $lineRates,
-                $fiscalZone,
-                $ordering++,
-                $reference,
+            $line = new LineInput(
+                $meta['name'] !== '' ? $meta['name'] : (string) ($item->description ?? self::FALLBACK_LINE_NAME),
+                (float) ($item->amount ?? 0),
+                $meta['reference'] !== '' ? $meta['reference'] : null,
                 $meta['summary'],
                 $meta['discount']
             );
+            // Only taxed lines get VAT; untaxed lines are exempt.
+            $lineRates = ((int) ($item->taxed ?? 0)) === 1 ? $rates : [];
+
+            $lines[] = $this->buildLine($line, $lineRates, $fiscalZone, $ordering++);
         }
 
         return $lines;
     }
 
     /**
-     * Build a single document product line, resolving product id and taxes.
+     * The single fallback line used when an order carries no invoice items.
      *
-     * @param array<int,float> $rates Applicable VAT rates (percent).
-     * @param array{code:string,countryId:int} $fiscalZone
+     * $orderTotal (tblorders.amount) is tax-inclusive, but Moloni adds VAT on
+     * top of the line price, so send the net amount to avoid double-taxing
+     * (mirrors the net per-item amounts in {@see resolveProductLines()}).
+     *
+     * @param array<int,float> $rates
      * @return array<string,mixed>
      * @throws ApiException
      */
-    private function buildLine(
-        string $name,
-        float $price,
-        array $rates,
-        array $fiscalZone,
-        int $ordering,
-        ?string $reference = null,
-        string $summary = '',
-        float $discount = 0.0
-    ): array {
+    private function singleOrderTotalLine(float $orderTotal, array $rates, FiscalZone $fiscalZone): array
+    {
+        $price = $this->netAmount($orderTotal, $rates);
+        $line = new LineInput(self::ORDER_TOTAL_LINE_NAME, $price, self::ORDER_TOTAL_REFERENCE);
+
+        return $this->buildLine($line, $rates, $fiscalZone, 1);
+    }
+
+    /**
+     * Build a single document product line, resolving product id and taxes.
+     *
+     * @param array<int,float> $rates Applicable VAT rates (percent).
+     * @return array<string,mixed>
+     * @throws ApiException
+     */
+    private function buildLine(LineInput $line, array $rates, FiscalZone $fiscalZone, int $ordering): array
+    {
         $lineTaxes = [];
-        $order = 1;
+        $taxOrdering = 1;
 
         foreach ($rates as $rate) {
             if ($rate <= 0) {
@@ -384,21 +436,31 @@ class DocumentService
                 $lineTaxes[] = [
                     'taxId' => (int) $tax['taxId'],
                     'value' => $rate,
-                    'ordering' => $order++,
+                    'ordering' => $taxOrdering++,
                     'cumulative' => false,
                 ];
             }
         }
 
-        $exemptionReason = $lineTaxes === [] ? $this->settings->exemptionReason() : '';
+        // Lines with no VAT are marked tax-exempt (with the configured reason)
+        // only when the operator enabled tax exemption.
+        $exemptionReason = ($lineTaxes === [] && $this->settings->taxExemption())
+            ? $this->settings->exemptionReason()
+            : '';
 
         return [
-            'productId' => $this->products->resolveId($name, $price, $lineTaxes, $exemptionReason, $reference),
-            'name' => $name,
-            'summary' => $summary,
+            'productId' => $this->products->resolveId(
+                $line->name(),
+                $line->price(),
+                $lineTaxes,
+                $exemptionReason,
+                $line->reference()
+            ),
+            'name' => $line->name(),
+            'summary' => $line->summary(),
             'qty' => 1,
-            'price' => $price,
-            'discount' => round($discount, 2),
+            'price' => $line->price(),
+            'discount' => round($line->discount(), 2),
             'ordering' => $ordering,
             'taxes' => $lineTaxes,
             'exemptionReason' => $exemptionReason,
@@ -474,9 +536,8 @@ class DocumentService
      * the client has no usable country.
      *
      * @param object|null $client tblclients row
-     * @return array{code:string,countryId:int}
      */
-    private function resolveFiscalZone($client): array
+    private function resolveFiscalZone($client): FiscalZone
     {
         $company = $this->companyFiscalZone();
 
@@ -494,26 +555,21 @@ class DocumentService
         // matching Moloni countryId comes from the country resolver.
         $country = $this->countries->resolve($iso2);
 
-        return [
-            'code' => $iso2,
-            'countryId' => $country['countryId'] ?? $company['countryId'],
-        ];
+        return new FiscalZone($iso2, (int) ($country['countryId'] ?? $company->countryId()));
     }
 
     /**
-     * The active company's fiscal zone (code + countryId) from the Context.
-     *
-     * @return array{code:string,countryId:int}
+     * The active company's fiscal zone from the Context.
      */
-    private function companyFiscalZone(): array
+    private function companyFiscalZone(): FiscalZone
     {
         $company = Context::company();
         $fiscalZone = $company !== null ? $company->get('fiscalZone') : null;
 
-        return [
-            'code' => (string) ($fiscalZone['fiscalZone'] ?? 'PT'),
-            'countryId' => $company !== null ? $company->getCountry() : 0,
-        ];
+        return new FiscalZone(
+            (string) ($fiscalZone['fiscalZone'] ?? ''),
+            $company !== null ? $company->getCountry() : 0
+        );
     }
 
     /**
@@ -527,12 +583,11 @@ class DocumentService
     private function closeIfRequested(
         int $documentId,
         string $documentType,
-        int $wantedStatus,
         float $orderTotal,
         float $documentTotal,
         int $orderId
     ): int {
-        if ($wantedStatus !== DocumentStatus::CLOSED) {
+        if ($this->settings->documentStatus() !== DocumentStatus::CLOSED) {
             return DocumentStatus::DRAFT;
         }
 
@@ -555,9 +610,9 @@ class DocumentService
     /**
      * Compare two monetary totals, tolerating floating-point rounding noise.
      */
-    private function totalsMatch(float $a, float $b): bool
+    private function totalsMatch(float $orderTotal, float $documentTotal): bool
     {
-        return abs($a - $b) < 0.01;
+        return abs($orderTotal - $documentTotal) < self::MONETARY_EPSILON;
     }
 
     /**
@@ -576,32 +631,5 @@ class DocumentService
             'invoice_total' => $documentTotal,
             'value' => (float) $order->amount,
         ]);
-    }
-
-    private function fetch(string $url): string
-    {
-        $ch = curl_init($url);
-
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => Platform::API_TIMEOUT,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-        ]);
-
-        $content = curl_exec($ch);
-        $error = curl_error($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($content === false) {
-            throw new DocumentException('Could not download PDF from Moloni ON: ' . $error);
-        }
-
-        if ($status >= 400) {
-            throw new DocumentException('Moloni ON media API returned HTTP ' . $status . '.');
-        }
-
-        return (string) $content;
     }
 }

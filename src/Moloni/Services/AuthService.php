@@ -27,6 +27,12 @@ class AuthService
     /** Refresh access tokens this many seconds before they actually expire. */
     private const EXPIRY_SKEW = 60;
 
+    /** Fallback access-token lifetime (seconds) when the grant omits expiresIn. */
+    private const DEFAULT_ACCESS_TTL = 3000;
+
+    /** Fallback refresh-token lifetime (seconds, ~10 days) when omitted. */
+    private const DEFAULT_REFRESH_TTL = 864000;
+
     private ApiClient $api;
 
     private MoloniClient $client;
@@ -198,8 +204,8 @@ class AuthService
         Auth::setTokens(
             (string) $tokens['accessToken'],
             (string) $tokens['refreshToken'],
-            (int) ($tokens['expiresIn'] ?? 3000),
-            (int) ($tokens['refreshExpiresIn'] ?? 864000)
+            (int) ($tokens['expiresIn'] ?? self::DEFAULT_ACCESS_TTL),
+            (int) ($tokens['refreshExpiresIn'] ?? self::DEFAULT_REFRESH_TTL)
         );
     }
 }

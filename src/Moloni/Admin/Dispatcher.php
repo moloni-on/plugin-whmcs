@@ -15,6 +15,7 @@ use Moloni\Services\LogService;
 use Moloni\Support\Company;
 use Moloni\Support\Context;
 use Moloni\Support\Lang;
+use Moloni\Support\Request;
 use Throwable;
 
 /**
@@ -26,10 +27,19 @@ use Throwable;
  */
 class Dispatcher
 {
+    /** WHMCS addon module slug and its relative admin path. */
+    private const MODULE_SLUG = 'moloni_on';
+    private const MODULE_PATH = 'addonmodules.php?module=' . self::MODULE_SLUG;
+
+    /** Dashboard pages the router will render (keep in sync with pageData/pageTemplate). */
+    private const PAGES = ['orders', 'documents', 'config', 'tools', 'logs'];
+
     private Container $container;
 
     /** @var array<string,mixed> */
     private array $vars;
+
+    private Request $request;
 
     private string $moduleLink;
 
@@ -39,11 +49,12 @@ class Dispatcher
     /**
      * @param array<string,mixed> $vars WHMCS module output vars.
      */
-    public function __construct(Container $container, array $vars)
+    public function __construct(Container $container, array $vars, ?Request $request = null)
     {
         $this->container = $container;
         $this->vars = $vars;
-        $this->moduleLink = (string) ($vars['modulelink'] ?? 'addonmodules.php?module=moloni_on');
+        $this->request = $request ?? Request::fromGlobals();
+        $this->moduleLink = (string) ($vars['modulelink'] ?? self::MODULE_PATH);
     }
 
     /**
@@ -53,18 +64,18 @@ class Dispatcher
     {
         Lang::boot((string) ($this->vars['adminLanguage'] ?? 'english') === 'portuguese' ? 'pt' : 'en');
 
-        $action = (string) ($_GET['action'] ?? '');
-        $op = (string) ($_REQUEST['op'] ?? '');
+        $action = $this->request->query('action');
+        $op = $this->request->request('op');
 
         // Reject forged POSTs (state-changing operations are always POST).
-        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        if ($this->request->isPost()) {
             $this->verifyCsrf();
         }
 
         try {
             // Streaming actions terminate the request themselves.
             if ($op === 'downloadPdf') {
-                $this->streamPdf((int) ($_GET['document_id'] ?? 0));
+                $this->streamPdf($this->request->queryInt('document_id'));
             }
 
             // 1. Start the OAuth flow from the login form.
@@ -72,44 +83,26 @@ class Dispatcher
                 return $this->connect();
             }
 
-            $authenticated = $this->container->auth()->ensureAuthenticated();
-
-            // 2. Complete the OAuth callback (code exchange). Only when not
-            // already authenticated, and only after validating the CSRF state
-            // nonce we issued when starting the flow.
-            if (!$authenticated && isset($_GET['code'])) {
-                if (!$this->container->auth()->verifyState((string) ($_GET['state'] ?? ''))) {
-                    throw new AuthException(Lang::get('oauth_state_mismatch'));
-                }
-
-                $this->container->auth()->exchangeCode((string) $_GET['code']);
-                $authenticated = $this->container->auth()->ensureAuthenticated();
-            }
-
-            // 3. Require a valid session.
-            if (!$authenticated) {
+            // 2. Require a valid OAuth session (completing the callback if any).
+            if (!$this->resolveAuthenticatedState()) {
                 return $this->renderStandalone('login');
             }
 
-            // 4. Company selection.
-            if ($op === 'selectCompany') {
-                $this->container->auth()->selectCompany((int) ($_POST['company_id'] ?? 0));
+            // 3. Require a selected company.
+            $companyPage = $this->ensureCompanySelected($op);
+
+            if ($companyPage !== null) {
+                return $companyPage;
             }
 
-            if (!$this->container->auth()->hasCompany()) {
-                return $this->renderCompanySelect();
-            }
-
-            $this->container->auth()->loadCompany();
-
-            // 5. Logout.
+            // 4. Logout.
             if ($action === 'logout') {
                 $this->container->auth()->logout();
 
                 return $this->renderStandalone('login');
             }
 
-            // 6. Mutating operations.
+            // 5. Mutating operations.
             if ($op !== '') {
                 $this->handleOperation($op);
             }
@@ -125,13 +118,57 @@ class Dispatcher
         return $this->renderPage($action !== '' ? $action : 'orders');
     }
 
+    /**
+     * Resolve the current OAuth session, completing the authorization-code
+     * callback when one is present — but only after validating the CSRF state
+     * nonce issued when the flow started.
+     */
+    private function resolveAuthenticatedState(): bool
+    {
+        $auth = $this->container->auth();
+        $authenticated = $auth->ensureAuthenticated();
+
+        if (!$authenticated && $this->request->query('code') !== '') {
+            if (!$auth->verifyState($this->request->query('state'))) {
+                throw new AuthException(Lang::get('oauth_state_mismatch'));
+            }
+
+            $auth->exchangeCode($this->request->query('code'));
+            $authenticated = $auth->ensureAuthenticated();
+        }
+
+        return $authenticated;
+    }
+
+    /**
+     * Ensure a company is selected and loaded into the Context. Returns the
+     * company-select page to render when none is chosen yet, or null once a
+     * company is active.
+     */
+    private function ensureCompanySelected(string $op): ?string
+    {
+        $auth = $this->container->auth();
+
+        if ($op === 'selectCompany') {
+            $auth->selectCompany($this->request->postInt('company_id'));
+        }
+
+        if (!$auth->hasCompany()) {
+            return $this->renderCompanySelect();
+        }
+
+        $auth->loadCompany();
+
+        return null;
+    }
+
     // ---- Operations -------------------------------------------------------
 
     private function handleOperation(string $op): void
     {
         switch ($op) {
             case 'createDocument':
-                $this->createDocument((int) ($_REQUEST['order_id'] ?? 0), (string) ($_REQUEST['document_type'] ?? ''));
+                $this->createDocument($this->request->requestInt('order_id'), $this->request->request('document_type'));
                 break;
 
             case 'bulkCreate':
@@ -139,12 +176,12 @@ class Dispatcher
                 break;
 
             case 'discard':
-                $this->container->orders()->discardOrder((int) ($_REQUEST['order_id'] ?? 0));
+                $this->container->orders()->discardOrder($this->request->requestInt('order_id'));
                 $this->success(Lang::get('order_discarded'));
                 break;
 
             case 'revert':
-                $this->container->orders()->revertDiscard((int) ($_REQUEST['order_id'] ?? 0));
+                $this->container->orders()->revertDiscard($this->request->requestInt('order_id'));
                 $this->success(Lang::get('order_reverted'));
                 break;
 
@@ -159,10 +196,21 @@ class Dispatcher
         }
     }
 
+    /**
+     * Translate a submitted document type into the value the document service
+     * expects: an empty selection means "use the configured default" (null).
+     * This empty-string <-> null mapping lives here and nowhere else.
+     */
+    private function normaliseDocumentType(string $documentType): ?string
+    {
+        return $documentType !== '' ? $documentType : null;
+    }
+
     private function createDocument(int $orderId, string $documentType): void
     {
         try {
-            $documentId = $this->container->documents()->createDocumentFromOrder($orderId, $documentType ?: null);
+            $documentId = $this->container->documents()
+                ->createDocumentFromOrder($orderId, $this->normaliseDocumentType($documentType));
             $this->success(Lang::get('document_created', ['id' => $documentId]));
         } catch (SkippedException $e) {
             $this->success(Lang::get('document_skipped'));
@@ -173,8 +221,8 @@ class Dispatcher
 
     private function bulkCreate(): void
     {
-        $orderIds = array_map('intval', (array) ($_POST['order_ids'] ?? []));
-        $documentType = (string) ($_POST['document_type'] ?? '');
+        $orderIds = array_map('intval', $this->request->postArray('order_ids'));
+        $documentType = $this->normaliseDocumentType($this->request->post('document_type'));
 
         if ($orderIds === []) {
             $this->error(Lang::get('no_orders_selected'));
@@ -182,7 +230,7 @@ class Dispatcher
             return;
         }
 
-        $result = $this->container->documents()->bulkCreateDocuments($orderIds, $documentType ?: null);
+        $result = $this->container->documents()->bulkCreateDocuments($orderIds, $documentType);
 
         $this->success(Lang::get('bulk_result', [
             'created' => count($result['created']),
@@ -195,37 +243,37 @@ class Dispatcher
     {
         $settings = $this->container->settings();
 
-        if (isset($_POST['document_type'])) {
-            $settings->set($settings::DOCUMENT_TYPE, (string) $_POST['document_type']);
+        if ($this->request->hasPost('document_type')) {
+            $settings->set($settings::DOCUMENT_TYPE, $this->request->post('document_type'));
         }
 
-        if (isset($_POST['document_status'])) {
-            $settings->set($settings::DOCUMENT_STATUS, (string) $_POST['document_status']);
+        if ($this->request->hasPost('document_status')) {
+            $settings->set($settings::DOCUMENT_STATUS, $this->request->post('document_status'));
         }
 
-        if (isset($_POST['document_set_id'])) {
-            $settings->set($settings::DOCUMENT_SET_ID, (string) $_POST['document_set_id']);
+        if ($this->request->hasPost('document_set_id')) {
+            $settings->set($settings::DOCUMENT_SET_ID, $this->request->post('document_set_id'));
         }
 
-        $settings->set($settings::TAX_EXEMPTION, isset($_POST['tax_exemption']) ? '1' : '0');
-        $settings->set($settings::AUTO_CREATE, isset($_POST['auto_create']) ? '1' : '0');
+        $settings->set($settings::TAX_EXEMPTION, $this->request->hasPost('tax_exemption') ? '1' : '0');
+        $settings->set($settings::AUTO_CREATE, $this->request->hasPost('auto_create') ? '1' : '0');
 
         foreach ([$settings::MEASUREMENT_UNIT_ID, $settings::PRODUCT_CATEGORY_ID] as $key) {
-            if (isset($_POST[$key])) {
-                $settings->set($key, (string) (int) $_POST[$key]);
+            if ($this->request->hasPost($key)) {
+                $settings->set($key, (string) $this->request->postInt($key));
             }
         }
 
-        if (isset($_POST[$settings::EXEMPTION_REASON])) {
-            $settings->set($settings::EXEMPTION_REASON, trim((string) $_POST[$settings::EXEMPTION_REASON]));
+        if ($this->request->hasPost($settings::EXEMPTION_REASON)) {
+            $settings->set($settings::EXEMPTION_REASON, trim($this->request->post($settings::EXEMPTION_REASON)));
         }
 
-        if (isset($_POST[$settings::FISCAL_ZONE_BASED_ON])) {
-            $settings->set($settings::FISCAL_ZONE_BASED_ON, (string) $_POST[$settings::FISCAL_ZONE_BASED_ON]);
+        if ($this->request->hasPost($settings::FISCAL_ZONE_BASED_ON)) {
+            $settings->set($settings::FISCAL_ZONE_BASED_ON, $this->request->post($settings::FISCAL_ZONE_BASED_ON));
         }
 
-        if (isset($_POST[$settings::VAT_FIELD])) {
-            $settings->set($settings::VAT_FIELD, trim((string) $_POST[$settings::VAT_FIELD]));
+        if ($this->request->hasPost($settings::VAT_FIELD)) {
+            $settings->set($settings::VAT_FIELD, trim($this->request->post($settings::VAT_FIELD)));
         }
 
         LoggerFacade::info('Settings saved.');
@@ -234,8 +282,8 @@ class Dispatcher
 
     private function connect(): string
     {
-        $developerId = trim((string) ($_POST['developer_id'] ?? ''));
-        $clientSecret = trim((string) ($_POST['client_secret'] ?? ''));
+        $developerId = trim($this->request->post('developer_id'));
+        $clientSecret = trim($this->request->post('client_secret'));
 
         if ($developerId === '' || $clientSecret === '') {
             $this->error(Lang::get('credentials_required'));
@@ -275,30 +323,20 @@ class Dispatcher
 
     private function renderPage(string $page): string
     {
-        $valid = ['orders', 'documents', 'config', 'tools', 'logs'];
-        $page = in_array($page, $valid, true) ? $page : 'orders';
+        $page = in_array($page, self::PAGES, true) ? $page : 'orders';
 
-        $data = $this->sharedData($page);
-        $data += $this->pageData($page);
+        $data = $this->sharedData($page) + $this->pageData($page);
+        $body = $this->container->template()->render($this->pageTemplate($page), $data);
 
-        $tpl = $this->container->template();
-
-        return $tpl->render('Blocks/header', $data)
-            . $tpl->render('Blocks/navbar', $data)
-            . $tpl->render('Blocks/messages', $data)
-            . $tpl->render($this->pageTemplate($page), $data)
-            . $tpl->render('Blocks/footer', $data);
+        return $this->renderLayout($body, $data, true);
     }
 
     private function renderStandalone(string $page): string
     {
         $data = $this->sharedData($page);
-        $tpl = $this->container->template();
+        $body = $this->container->template()->render($page, $data);
 
-        return $tpl->render('Blocks/header', $data)
-            . $tpl->render('Blocks/messages', $data)
-            . $tpl->render($page, $data)
-            . $tpl->render('Blocks/footer', $data);
+        return $this->renderLayout($body, $data);
     }
 
     private function renderCompanySelect(): string
@@ -311,11 +349,31 @@ class Dispatcher
         }
 
         $data = $this->sharedData('company') + ['companies' => $companies];
+        $body = $this->container->template()->render('company', $data);
+
+        return $this->renderLayout($body, $data);
+    }
+
+    /**
+     * Wrap page body HTML in the shared header/messages/footer chrome. The
+     * dashboard pages also get the navigation bar (between header and messages);
+     * the standalone login/company screens do not.
+     *
+     * @param array<string,mixed> $data
+     */
+    private function renderLayout(string $body, array $data, bool $withNavbar = false): string
+    {
         $tpl = $this->container->template();
 
-        return $tpl->render('Blocks/header', $data)
+        $html = $tpl->render('Blocks/header', $data);
+
+        if ($withNavbar) {
+            $html .= $tpl->render('Blocks/navbar', $data);
+        }
+
+        return $html
             . $tpl->render('Blocks/messages', $data)
-            . $tpl->render('company', $data)
+            . $body
             . $tpl->render('Blocks/footer', $data);
     }
 
@@ -397,12 +455,12 @@ class Dispatcher
     {
         $filters = [];
 
-        if (!empty($_GET['level'])) {
-            $filters['level'] = (string) $_GET['level'];
+        if ($this->request->query('level') !== '') {
+            $filters['level'] = $this->request->query('level');
         }
 
-        if (!empty($_GET['order_id'])) {
-            $filters['order_id'] = (int) $_GET['order_id'];
+        if ($this->request->queryInt('order_id') > 0) {
+            $filters['order_id'] = $this->request->queryInt('order_id');
         }
 
         return $filters;
@@ -440,11 +498,12 @@ class Dispatcher
 
     private function absoluteModuleUrl(): string
     {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
-        $dir = rtrim(dirname((string) ($_SERVER['PHP_SELF'] ?? '')), '/');
+        $https = $this->request->server('HTTPS');
+        $scheme = ($https !== '' && $https !== 'off') ? 'https' : 'http';
+        $host = $this->request->server('HTTP_HOST');
+        $dir = rtrim(dirname($this->request->server('PHP_SELF')), '/');
 
-        return $scheme . '://' . $host . $dir . '/addonmodules.php?module=moloni_on';
+        return $scheme . '://' . $host . $dir . '/' . self::MODULE_PATH;
     }
 
     /**

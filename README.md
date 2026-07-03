@@ -42,9 +42,10 @@ src/Moloni/
   Api/                 ApiClient (OAuth + GraphQL over cURL), MoloniClient (domain wrapper)
   GraphQL/             One class per query/mutation
   Services/            DocumentService, OrderService, AuthService, SettingsService, LogService,
-                       CountryResolver, ProductResolver, TaxResolver
+                       CountryResolver, CustomerResolver, ProductResolver, TaxResolver,
+                       LineMapper, PaymentResolver
   Models/              Config, Auth, Order, Document, Log + Whmcs (native-table reads)
-  Support/             Platform, Context, Lang, Template
+  Support/             Platform, Context, Company, Lang, Template, Request, FiscalZone, LineInput
   Enums/ Exceptions/ Facades/
 templates/             UI pages + Blocks/ (shared layout)
 lang/                  en.php, pt.php

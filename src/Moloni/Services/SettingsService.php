@@ -64,6 +64,11 @@ class SettingsService
         return (int) $this->get(self::DOCUMENT_SET_ID, '0');
     }
 
+    /**
+     * Whether to mark untaxed order lines as tax-exempt (applying the configured
+     * {@see exemptionReason()}). When off, lines without a VAT rate carry no
+     * exemption reason.
+     */
     public function taxExemption(): bool
     {
         return (string) $this->get(self::TAX_EXEMPTION, '0') === '1';

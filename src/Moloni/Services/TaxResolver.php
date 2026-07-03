@@ -7,6 +7,7 @@ namespace Moloni\Services;
 use Moloni\Api\MoloniClient;
 use Moloni\Enums\TaxFiscalZoneType;
 use Moloni\Enums\TaxType;
+use Moloni\Support\FiscalZone;
 
 /**
  * Resolves a Moloni ON VAT tax for a given rate within the company's fiscal
@@ -29,14 +30,11 @@ class TaxResolver
     /**
      * Return the Moloni tax for a rate, creating it if necessary.
      *
-     * @param array{code:string,countryId:int} $fiscalZone
      * @return array<string,mixed> The Moloni tax (contains taxId), or [] on failure.
      */
-    public function resolve(float $rate, array $fiscalZone): array
+    public function resolve(float $rate, FiscalZone $fiscalZone): array
     {
-        // Normalise the zone code once; Moloni stores fiscal-zone codes in
-        // upper case, so both the lookup and any created tax use that form.
-        $code = strtoupper((string) ($fiscalZone['code'] ?? 'PT'));
+        $code = $fiscalZone->code();
         $key = $rate . '|' . $code;
 
         if (isset($this->cache[$key])) {
@@ -46,10 +44,16 @@ class TaxResolver
         $tax = $this->client->findTax($rate, $code);
 
         if ($tax === null || empty($tax['taxId'])) {
-            $tax = $this->create($rate, $code, (int) ($fiscalZone['countryId'] ?? 0));
+            $tax = $this->create($rate, $code, $fiscalZone->countryId());
         }
 
-        return $this->cache[$key] = $tax;
+        // Only memoise a real resolution: caching a failed lookup ([] / no
+        // taxId) would silently strip VAT from every later line at this rate.
+        if (!empty($tax['taxId'])) {
+            $this->cache[$key] = $tax;
+        }
+
+        return $tax;
     }
 
     /**
