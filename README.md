@@ -82,9 +82,12 @@ WHMCS needs the ionCube Loader — see [docker/whmcs.Dockerfile](docker/whmcs.Do
 ## Build / release
 
 `composer build` (or `./build.sh`) produces `dist/moloni_on.zip` (module + prod dependencies)
-ready to install; `composer build:install` first refreshes prod-only dependencies. Pushing a
-`v*` tag runs [.github/workflows/release.yml](.github/workflows/release.yml), which builds that
-zip and attaches it to a GitHub Release.
+ready to install. It always runs a fresh `--no-dev` install first, so dev tooling (PHPUnit,
+phpcs) can never leak into the shipped zip; pass `./build.sh --skip-install` to reuse a
+vendor/ you already know is prod-only. Every push and pull request runs
+[.github/workflows/ci.yml](.github/workflows/ci.yml) (phpcs + PHPUnit on PHP 7.4/8.1/8.2);
+pushing a `v*` tag runs [.github/workflows/release.yml](.github/workflows/release.yml), which
+builds that zip and attaches it to a GitHub Release.
 
 ## Documentation
 

@@ -5,8 +5,9 @@
 # plugin's build.bat.
 #
 # Usage:
-#   ./build.sh            # reuse existing vendor/ if present
-#   ./build.sh --install  # force a fresh prod (no-dev) composer install
+#   ./build.sh                # fresh prod (no-dev) install, then package (default)
+#   ./build.sh --install      # same as default (kept for backwards compat)
+#   ./build.sh --skip-install # reuse an existing vendor/ known to be prod-only
 #
 set -euo pipefail
 
@@ -15,8 +16,16 @@ DIST="dist"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-# Prod dependencies (no dev tooling in the shipped package).
-if [ ! -d vendor ] || [ "${1:-}" = "--install" ]; then
+# Ship production dependencies only: dev tooling (PHPUnit, phpcs) must never end
+# up in the package. A fresh --no-dev install is therefore the DEFAULT — reusing
+# whatever is in vendor/ risked bundling dev deps left there by `composer
+# install`. Pass --skip-install to opt out when vendor/ is already prod-only.
+if [ "${1:-}" = "--skip-install" ]; then
+    if [ ! -d vendor ]; then
+        echo "error: --skip-install given but vendor/ is missing" >&2
+        exit 1
+    fi
+else
     composer install --no-dev --prefer-dist --no-progress --optimize-autoloader
 fi
 

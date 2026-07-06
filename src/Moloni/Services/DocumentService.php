@@ -91,6 +91,25 @@ class DocumentService
             throw new ValidationException('Unsupported document type: ' . $documentType);
         }
 
+        // Idempotency guard: a Moloni document is a sequentially-numbered legal
+        // record with no recall, so an order must never be billed twice. If it
+        // is already synced, return the existing document id rather than issuing
+        // a duplicate (double-submit, bulk re-run, or the auto-create hook
+        // racing a manual click). The tracking row's UNIQUE order_id also stops
+        // a second row appearing; the narrow window where two truly-simultaneous
+        // requests both pass this check before either persists is accepted (a
+        // DB-level claim/lock would be the full fix — see the journal).
+        $existingId = $this->alreadySyncedDocumentId($orderId);
+
+        if ($existingId !== null) {
+            LoggerFacade::info('Order already synced; returning existing document.', [
+                'order_id' => $orderId,
+                'document_id' => $existingId,
+            ], $orderId);
+
+            return $existingId;
+        }
+
         $order = Whmcs::getOrder($orderId);
 
         if ($order === null) {
@@ -159,6 +178,24 @@ class DocumentService
     }
 
     /**
+     * The Moloni document id an order was already synced to, or null when the
+     * order has never been successfully billed (pending, failed or discarded —
+     * a failed order is allowed to retry, a discarded one is handled elsewhere).
+     */
+    private function alreadySyncedDocumentId(int $orderId): ?int
+    {
+        $tracked = Order::findByOrderId($orderId);
+
+        if ($tracked === null || $tracked->status !== Order::STATUS_SYNCED) {
+            return null;
+        }
+
+        $documentId = (int) ($tracked->moloni_document_id ?? 0);
+
+        return $documentId > 0 ? $documentId : null;
+    }
+
+    /**
      * A document must have at least one billable line. An order with no invoice
      * (or an invoice with no items) cannot be turned into a Moloni document, so
      * it is refused — mirroring the classic Moloni WHMCS plugin, which required
@@ -222,7 +259,7 @@ class DocumentService
             'documentSetId' => $this->settings->documentSetId(),
             'fiscalZone' => $fiscalZone->code(),
             'date' => $now,
-            'expirationDate' => $now,
+            'expirationDate' => $this->expirationDate($invoice, $now),
             // Always create as draft; the document is only closed afterwards
             // once we've confirmed Moloni's total matches the order total.
             'status' => DocumentStatus::DRAFT,
@@ -252,6 +289,28 @@ class DocumentService
         }
 
         return $payload;
+    }
+
+    /**
+     * The document expiration (due) date: the WHMCS invoice's due date when it
+     * carries a real one, falling back to the issue date. Using the issue date
+     * for both made every document due immediately; the invoice due date is the
+     * correct payment deadline to print on the document.
+     *
+     * @param object|null $invoice tblinvoices row
+     */
+    private function expirationDate($invoice, string $fallback): string
+    {
+        $dueDate = trim((string) ($invoice->duedate ?? ''));
+
+        // WHMCS stores an unset due date as the zero date; treat that as absent.
+        if ($dueDate === '' || strpos($dueDate, '0000-00-00') === 0) {
+            return $fallback;
+        }
+
+        $timestamp = strtotime($dueDate);
+
+        return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : $fallback;
     }
 
     /**

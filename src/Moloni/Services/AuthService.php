@@ -174,7 +174,15 @@ class AuthService
     }
 
     /**
+     * Attempt to refresh the access token.
+     *
+     * Returns false only when the session is unrecoverable (refresh token gone,
+     * expired, or rejected) — the caller then logs out. A transient failure
+     * (network / 5xx / 429) propagates as an {@see ApiException} instead, so the
+     * session is left intact for a later retry rather than being torn down.
+     *
      * @param array<string,mixed> $row
+     * @throws ApiException on a transient refresh failure
      */
     private function refresh(array $row): bool
     {

@@ -38,8 +38,8 @@
     "build:install": "bash build.sh --install"
   },
   "scripts-descriptions": {
-    "build": "Package the addon into dist/moloni_on.zip (reuses vendor/).",
-    "build:install": "Reinstall prod (no-dev) dependencies, then package into dist/moloni_on.zip."
+    "build": "Fresh prod (no-dev) install, then package the addon into dist/moloni_on.zip.",
+    "build:install": "Alias of build (kept for compatibility): prod install + package."
   },
   "config": {
     "optimize-autoloader": true,

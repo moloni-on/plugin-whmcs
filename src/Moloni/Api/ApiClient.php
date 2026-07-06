@@ -47,7 +47,7 @@ class ApiClient
             $body['variables'] = $variables;
         }
 
-        $response = $this->httpPost(
+        $result = $this->httpPost(
             Platform::API_URL,
             (string) json_encode($body),
             [
@@ -57,13 +57,30 @@ class ApiClient
             ]
         );
 
-        $parsed = json_decode($response, true);
+        // Distinguish an expired/invalid token (401) and transient outages
+        // (429/5xx) from a business error before parsing: they are otherwise
+        // indistinguishable once collapsed into the response body.
+        $this->assertHttpOk($result['status']);
+
+        $parsed = json_decode($result['body'], true);
 
         if (!is_array($parsed)) {
-            throw new ApiException('Invalid response from Moloni ON API.', ['raw' => $response]);
+            throw new ApiException(
+                'Invalid response from Moloni ON API.',
+                ['raw' => $result['body'], 'status' => $result['status']]
+            );
         }
 
         $this->assertNoErrors($operation, $parsed, $variables);
+
+        // A non-2xx/3xx status that carried no recognisable GraphQL error node
+        // is still a failure — never treat it as a successful response.
+        if ($result['status'] >= 400) {
+            throw new ApiException(
+                'Moloni ON API returned HTTP ' . $result['status'] . '.',
+                ['status' => $result['status']]
+            );
+        }
 
         return $parsed;
     }
@@ -98,7 +115,14 @@ class ApiClient
     /**
      * Refresh an expired access token.
      *
-     * @return array{accessToken:string,refreshToken:string}|null Null on failure.
+     * Returns null only when the refresh token is definitively rejected (the
+     * session cannot be recovered). A transient failure (network / 5xx / 429) is
+     * rethrown instead, so the caller keeps the session and retries later rather
+     * than forcing a needless full re-authentication.
+     *
+     * @return array{accessToken:string,refreshToken:string}|null Null when the
+     *         refresh token is rejected.
+     * @throws ApiException on a transient failure
      */
     public function refresh(string $clientId, string $clientSecret, string $refreshToken): ?array
     {
@@ -112,6 +136,10 @@ class ApiClient
         try {
             $parsed = $this->grantRequest($fields);
         } catch (ApiException $e) {
+            if (!empty($e->getData()['transient'])) {
+                throw $e;
+            }
+
             return null;
         }
 
@@ -136,6 +164,37 @@ class ApiClient
         }
 
         return $url;
+    }
+
+    /**
+     * Fail fast on the HTTP-transport outcomes that must not be read as a
+     * business response: a rejected token (401 → re-auth) and transient outages
+     * (429 / 5xx → retryable). Everything else is left to the body-level checks.
+     *
+     * @throws AuthException on 401
+     * @throws ApiException on a transient status
+     */
+    private function assertHttpOk(int $status): void
+    {
+        if ($status === 401) {
+            throw new AuthException('Moloni ON rejected the access token (HTTP 401).', ['status' => 401]);
+        }
+
+        if ($this->isTransientStatus($status)) {
+            throw new ApiException(
+                'Moloni ON is temporarily unavailable (HTTP ' . $status . ').',
+                ['status' => $status, 'transient' => true]
+            );
+        }
+    }
+
+    /**
+     * Whether an HTTP status denotes a transient, retryable condition (rate
+     * limiting or a server-side error) rather than a permanent rejection.
+     */
+    private function isTransientStatus(int $status): bool
+    {
+        return $status === 429 || $status >= 500;
     }
 
     /**
@@ -168,20 +227,35 @@ class ApiClient
      */
     private function grantRequest(string $fields): array
     {
-        $response = $this->httpPost(
+        $result = $this->httpPost(
             Platform::AUTH_GRANT,
             $fields,
             ['Content-Type: application/x-www-form-urlencoded', 'User-Agent: ' . Platform::USER_AGENT]
         );
 
-        $parsed = json_decode($response, true);
+        // A transient outage must be flagged so a token refresh does not mistake
+        // it for a rejected refresh token and tear the session down.
+        if ($this->isTransientStatus($result['status'])) {
+            throw new ApiException(
+                'Moloni ON auth endpoint is temporarily unavailable (HTTP ' . $result['status'] . ').',
+                ['status' => $result['status'], 'transient' => true]
+            );
+        }
+
+        $parsed = json_decode($result['body'], true);
 
         if (!is_array($parsed)) {
-            throw new ApiException('Invalid response from Moloni ON auth endpoint.', ['raw' => $response]);
+            throw new ApiException(
+                'Invalid response from Moloni ON auth endpoint.',
+                ['raw' => $result['body'], 'status' => $result['status']]
+            );
         }
 
         if (isset($parsed['error'])) {
-            throw new ApiException('Moloni ON auth error.', ['response' => $this->redactSecrets($parsed)]);
+            throw new ApiException(
+                'Moloni ON auth error.',
+                ['response' => $this->redactSecrets($parsed), 'status' => $result['status']]
+            );
         }
 
         return $parsed;
@@ -243,9 +317,10 @@ class ApiClient
 
     /**
      * @param array<int,string> $headers
+     * @return array{status:int,body:string}
      * @throws ApiException
      */
-    private function httpPost(string $url, string $body, array $headers): string
+    private function httpPost(string $url, string $body, array $headers): array
     {
         $ch = curl_init($url);
 
@@ -265,11 +340,14 @@ class ApiClient
             $error = curl_error($ch);
             curl_close($ch);
 
-            throw new ApiException('Could not reach Moloni ON: ' . $error);
+            // A connection-level failure is transient: it never reached Moloni,
+            // so it must not be read as a rejected token/refresh.
+            throw new ApiException('Could not reach Moloni ON: ' . $error, ['transient' => true]);
         }
 
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        return (string) $response;
+        return ['status' => $status, 'body' => (string) $response];
     }
 }

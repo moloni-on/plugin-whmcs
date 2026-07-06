@@ -609,12 +609,51 @@ class Dispatcher
 
     private function absoluteModuleUrl(): string
     {
+        // The path (admin directory + script) always comes from the request so a
+        // renamed admin folder still resolves. Only the origin is sensitive: the
+        // Host header is attacker-controlled, so prefer the origin of the URL the
+        // administrator configured in WHMCS for the OAuth redirect_uri, falling
+        // back to the request-derived one outside a WHMCS install (e.g. tests).
+        $dir = rtrim(dirname($this->request->server('PHP_SELF')), '/');
+        $origin = $this->configuredOrigin() ?: $this->requestOrigin();
+
+        return $origin . $dir . '/' . self::MODULE_PATH;
+    }
+
+    /**
+     * scheme://host[:port] of the request itself (Host header — spoofable).
+     */
+    private function requestOrigin(): string
+    {
         $https = $this->request->server('HTTPS');
         $scheme = ($https !== '' && $https !== 'off') ? 'https' : 'http';
-        $host = $this->request->server('HTTP_HOST');
-        $dir = rtrim(dirname($this->request->server('PHP_SELF')), '/');
 
-        return $scheme . '://' . $host . $dir . '/' . self::MODULE_PATH;
+        return $scheme . '://' . $this->request->server('HTTP_HOST');
+    }
+
+    /**
+     * scheme://host[:port] of the WHMCS-configured SystemURL, or "" when it
+     * cannot be resolved (e.g. outside a WHMCS install).
+     */
+    private function configuredOrigin(): string
+    {
+        if (!class_exists(\WHMCS\Config\Setting::class)) {
+            return '';
+        }
+
+        try {
+            $url = trim((string) \WHMCS\Config\Setting::getValue('SystemURL'));
+        } catch (Throwable $e) {
+            return '';
+        }
+
+        $parts = $url !== '' ? parse_url($url) : false;
+
+        if ($parts === false || empty($parts['scheme']) || empty($parts['host'])) {
+            return '';
+        }
+
+        return $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
     }
 
     /**
