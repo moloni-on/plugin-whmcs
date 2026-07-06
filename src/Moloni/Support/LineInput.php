@@ -25,23 +25,36 @@ final class LineInput
 
     private float $discount;
 
+    private string $productName;
+
     public function __construct(
         string $name,
         float $price,
         ?string $reference = null,
         string $summary = '',
-        float $discount = 0.0
+        float $discount = 0.0,
+        string $productName = ''
     ) {
         $this->name = $name;
         $this->price = $price;
         $this->reference = $reference;
         $this->summary = $summary;
         $this->discount = $discount;
+        $this->productName = $productName;
     }
 
     public function name(): string
     {
         return $this->name;
+    }
+
+    /**
+     * The generic name to give the Moloni product when it is CREATED (permanent;
+     * a product cannot be renamed later). Empty falls back to the display name.
+     */
+    public function productName(): string
+    {
+        return $this->productName;
     }
 
     public function price(): float

@@ -536,6 +536,32 @@ try {
 
 ---
 
+## Extensibility (custom hooks)
+
+`Support\Hooks` wraps WHMCS's `run_hook()` so the module can expose its own hook
+points; integrators subscribe with `add_hook()` in `/includes/hooks/`. Each call
+degrades to a no-op when `run_hook()` is undefined (unit tests / non-WHMCS), so
+the wrapper is always safe to invoke. Three shapes:
+
+- **`filter($hook, $value, $vars)`** — callbacks may replace `$value` (passed to
+  them under `value`); the last non-empty return wins. Used for
+  `MoloniOnProductName` (rename a product at creation) and
+  `MoloniOnBeforeCreateDocument` (amend the `<Type>Insert` payload).
+- **`doAction($hook, $vars)`** — fire-and-forget notification;
+  `MoloniOnAfterCreateDocument`, `MoloniOnAfterCloseDocument`,
+  `MoloniOnDocumentFailed`.
+- **`allows($hook, $vars)`** — veto gate returning `true` unless a callback
+  returns `false`; `MoloniOnBeforeCloseDocument` keeps a matched document a draft.
+
+The product-name hook fires while mapping each line (`LineMapper::map()`), and its
+result is used only if/when the product is actually created — a Moloni product
+cannot be renamed afterwards, so it is created under a generic, action-describing
+name while the order-specific name still appears on the document line.
+
+See the hook table in [CLAUDE.md](CLAUDE.md) for the full list and payloads.
+
+---
+
 ## Security Considerations
 
 1. **OAuth2 Credential & Token Storage**

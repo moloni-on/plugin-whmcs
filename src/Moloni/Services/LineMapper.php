@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Moloni\Services;
 
 use Moloni\Models\Whmcs;
+use Moloni\Support\Hooks;
 
 /**
  * Maps a WHMCS invoice line to its Moloni ON document-line metadata:
@@ -37,13 +38,31 @@ class LineMapper
 
     /**
      * @param object $item tblinvoiceitems row (type, relid, description, amount, duedate)
-     * @return array{name:string,reference:string,summary:string,discount:float,skip:bool}
+     * @return array{name:string,reference:string,summary:string,discount:float,skip:bool,productName:string}
      */
     public function map($item, int $invoiceId): array
     {
         $type = (string) ($item->type ?? '');
-        $relId = (int) ($item->relid ?? 0);
+        $meta = $this->mapByType($type, $item, $invoiceId, (int) ($item->relid ?? 0));
 
+        // The generic name given to the Moloni product when it is created (a
+        // product cannot be renamed afterwards). Integrators can override it via
+        // the MoloniOnProductName hook; the document line keeps `name`.
+        $meta['productName'] = Hooks::filter(
+            Hooks::PRODUCT_NAME,
+            $this->genericProductName($type, $meta['name']),
+            ['type' => $type, 'reference' => $meta['reference'], 'item' => $item, 'displayName' => $meta['name']]
+        );
+
+        return $meta;
+    }
+
+    /**
+     * @param object $item tblinvoiceitems row
+     * @return array{name:string,reference:string,summary:string,discount:float,skip:bool}
+     */
+    private function mapByType(string $type, $item, int $invoiceId, int $relId): array
+    {
         switch ($type) {
             case 'DomainTransfer':
                 return $this->domain($item, $invoiceId, $relId, 'Transferência de Domínio', 'T-', false);
@@ -191,6 +210,39 @@ class LineMapper
         }
 
         return $this->referenceCache[$key];
+    }
+
+    /**
+     * A generic, action-describing name for the Moloni product created for a
+     * line — deliberately not the order-specific description, because a Moloni
+     * product cannot be renamed once created and the product is shared by every
+     * order line with the same reference. Falls back to the display name (then a
+     * neutral default) for line types with no fixed action.
+     */
+    private function genericProductName(string $type, string $displayName): string
+    {
+        switch ($type) {
+            case 'DomainTransfer':
+                return 'Transferência de Domínio';
+            case 'DomainRegister':
+                return 'Registo de Domínio';
+            case 'Domain':
+                return 'Renovação de Domínio';
+            case 'Hosting':
+                return self::HOSTING_REFERENCE;
+            case 'Addon':
+                return 'Addon';
+            case 'Upgrade':
+                return 'Upgrade/Downgrade';
+            case 'Setup':
+                return 'Taxa de Instalação';
+            case 'AddFunds':
+                return 'Adição de Fundos';
+            case 'LateFee':
+                return 'Taxa de Atraso';
+        }
+
+        return $displayName !== '' ? $displayName : 'Artigo';
     }
 
     /**

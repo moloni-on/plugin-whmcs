@@ -331,6 +331,50 @@ Before going live:
 
 ---
 
+## Extending the module (custom hooks)
+
+The module fires custom WHMCS hooks you can subscribe to from a file in your
+WHMCS `/includes/hooks/` directory (e.g. `includes/hooks/moloni_on.php`). No
+core files are touched, so your customisations survive module updates.
+
+```php
+<?php
+
+// Rename the product the module CREATES in Moloni ON (permanent — a product
+// cannot be renamed later; the order-specific name still shows on the document).
+add_hook('MoloniOnProductName', 1, function (array $vars) {
+    // $vars: type, reference, item, displayName, value (the default name)
+    if ($vars['type'] === 'Hosting') {
+        return 'Serviço de Alojamento';
+    }
+    return null; // null / '' = keep the default
+});
+
+// Amend the document payload before it is sent to Moloni ON.
+add_hook('MoloniOnBeforeCreateDocument', 1, function (array $vars) {
+    $payload = $vars['value']; // the <Type>Insert array
+    $payload['notes'] = 'WHMCS order #' . $vars['order_id'];
+    return $payload;
+});
+
+// Keep a matched document as a draft instead of closing it (return false).
+add_hook('MoloniOnBeforeCloseDocument', 1, function (array $vars) {
+    return $vars['order_total'] <= 1000; // only auto-close orders up to 1000
+});
+
+// React after a document is created / closed / failed.
+add_hook('MoloniOnAfterCreateDocument', 1, function (array $vars) {
+    logActivity('Moloni document ' . $vars['document_id'] . ' created.');
+});
+```
+
+Available hooks: `MoloniOnProductName`, `MoloniOnBeforeCreateDocument`,
+`MoloniOnAfterCreateDocument`, `MoloniOnBeforeCloseDocument`,
+`MoloniOnAfterCloseDocument`, `MoloniOnDocumentFailed`. See the hook table in
+[CLAUDE.md](CLAUDE.md) for each one's payload and shape (filter / action / veto).
+
+---
+
 ## Troubleshooting
 
 ### Module Not Appearing in Addons List

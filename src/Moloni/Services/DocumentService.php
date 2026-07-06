@@ -19,6 +19,7 @@ use Moloni\Models\Whmcs;
 use Moloni\Support\Context;
 use Moloni\Support\CurrencyExchange;
 use Moloni\Support\FiscalZone;
+use Moloni\Support\Hooks;
 use Moloni\Support\LineInput;
 use Moloni\Support\Platform;
 use Throwable;
@@ -104,6 +105,14 @@ class DocumentService
             $this->guardAgainstMassPayment($orderId, $items);
 
             $payload = $this->buildDocumentPayload($order, $invoice, $items, $documentType);
+
+            // Let integrators inspect or amend the <Type>Insert before it is sent.
+            $payload = Hooks::filter(Hooks::BEFORE_CREATE_DOCUMENT, $payload, [
+                'order_id' => $orderId,
+                'document_type' => $documentType,
+                'order' => $order,
+            ]);
+
             $document = $this->submitAndReconcile($payload, $order, $documentType);
 
             $this->persist($order, $document['id'], $document['total'], $documentType, $document['status']);
@@ -113,6 +122,14 @@ class DocumentService
                 'document_id' => $document['id'],
                 'status' => $document['status'],
             ], $orderId);
+
+            Hooks::doAction(Hooks::AFTER_CREATE_DOCUMENT, [
+                'order_id' => $orderId,
+                'document_id' => $document['id'],
+                'document_type' => $documentType,
+                'total' => $document['total'],
+                'status' => $document['status'],
+            ]);
 
             return $document['id'];
         } catch (SkippedException $e) {
@@ -130,6 +147,12 @@ class DocumentService
                 'error' => $e->getMessage(),
                 'data' => $data,
             ], $orderId);
+
+            Hooks::doAction(Hooks::DOCUMENT_FAILED, [
+                'order_id' => $orderId,
+                'document_type' => $documentType,
+                'error' => $e->getMessage(),
+            ]);
 
             throw new DocumentException($e->getMessage(), $data, 0, $e);
         }
@@ -540,7 +563,8 @@ class DocumentService
                 $price,
                 $meta['reference'] !== '' ? $meta['reference'] : null,
                 $meta['summary'],
-                $meta['discount']
+                $meta['discount'],
+                $meta['productName']
             );
             // Only taxed lines get VAT; untaxed lines are exempt.
             $lineRates = ((int) ($item->taxed ?? 0)) === 1 ? $rates : [];
@@ -590,7 +614,8 @@ class DocumentService
                 $line->price(),
                 $lineTaxes,
                 $exemptionReason,
-                $line->reference()
+                $line->reference(),
+                $line->productName()
             ),
             'name' => $line->name(),
             'summary' => $line->summary(),
@@ -718,7 +743,31 @@ class DocumentService
             return DocumentStatus::DRAFT;
         }
 
+        // Let integrators keep a matched document as a draft (return false).
+        $mayClose = Hooks::allows(Hooks::BEFORE_CLOSE_DOCUMENT, [
+            'order_id' => $orderId,
+            'document_id' => $documentId,
+            'document_type' => $documentType,
+            'order_total' => $orderTotal,
+            'document_total' => $documentTotal,
+        ]);
+
+        if (!$mayClose) {
+            LoggerFacade::info('Document left as draft: closing vetoed by hook.', [
+                'order_id' => $orderId,
+                'document_id' => $documentId,
+            ], $orderId);
+
+            return DocumentStatus::DRAFT;
+        }
+
         $this->client->updateDocumentStatus($documentId, DocumentStatus::CLOSED, $documentType);
+
+        Hooks::doAction(Hooks::AFTER_CLOSE_DOCUMENT, [
+            'order_id' => $orderId,
+            'document_id' => $documentId,
+            'document_type' => $documentType,
+        ]);
 
         return DocumentStatus::CLOSED;
     }

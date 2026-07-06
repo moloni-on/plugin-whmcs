@@ -34,6 +34,8 @@ class ProductResolver
      * Return the Moloni product id for the given item, creating it if needed.
      *
      * @param array<int,array<string,mixed>> $taxes  Product taxes ({taxId,value,ordering}).
+     * @param string|null $createName Generic name to use when the product is
+     *        created (permanent); falls back to $name. Does not affect matching.
      * @throws ApiException
      */
     public function resolveId(
@@ -41,7 +43,8 @@ class ProductResolver
         float $price,
         array $taxes = [],
         string $exemptionReason = '',
-        ?string $reference = null
+        ?string $reference = null,
+        ?string $createName = null
     ): int {
         $name = $name !== '' ? $name : 'Item';
         $reference = $reference ?: $this->referenceFrom($name);
@@ -56,7 +59,11 @@ class ProductResolver
             return $this->cache[$reference] = (int) $existing['productId'];
         }
 
-        $insert = $this->buildInsert($name, $reference, $price, $taxes, $exemptionReason);
+        // A product cannot be renamed once created, so it is created under a
+        // generic, action-describing name ($createName) rather than the
+        // order-specific line name; the line name still shows on the document.
+        $productName = ($createName !== null && $createName !== '') ? $createName : $name;
+        $insert = $this->buildInsert($productName, $reference, $price, $taxes, $exemptionReason);
         $created = $this->client->createProduct($insert);
         $productId = (int) ($created['productId'] ?? 0);
 
