@@ -20,13 +20,26 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '7.4'
+          extensions: curl, json, mbstring
           tools: composer:v2
+          coverage: none
 
-      - name: Install production dependencies
-        run: composer install --no-dev --prefer-dist --no-progress --optimize-autoloader
+      # Gate the release on the same checks CI runs: a tag on a red commit must
+      # not build and publish. These need the dev tooling (phpcs, PHPUnit), so
+      # install with dev deps here...
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
 
+      - name: Lint (PSR-12)
+        run: composer lint
+
+      - name: Test
+        run: composer test
+
+      # ...then let build.sh do its own fresh --no-dev install, so the dev
+      # tooling installed above never ends up in the shipped package.
       - name: Build package
-        run: bash build.sh --skip-install
+        run: bash build.sh
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

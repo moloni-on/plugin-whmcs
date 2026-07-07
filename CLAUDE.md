@@ -93,7 +93,7 @@ composer lint:fix     # auto-fix style
 composer build        # package addon -> dist/moloni_on.zip (always a fresh --no-dev install; ./build.sh --skip-install reuses vendor/)
 ```
 
-CI: every push/PR runs `.github/workflows/ci.yml` (phpcs + PHPUnit on PHP 7.4/8.1/8.2); `v*` tags run `release.yml` (build + GitHub Release).
+CI: every push/PR runs `.github/workflows/ci.yml` (phpcs + PHPUnit on PHP 7.4/8.1/8.2); `v*` tags run `release.yml`, which re-runs those same phpcs + PHPUnit checks before building (so a tag on a red commit can't publish) and then builds + publishes the GitHub Release.
 
 **No PHP locally** — this machine has no `php`/`composer` on PATH. Run tooling through Docker, e.g.
 `docker run --rm -v "$PWD":/app -w /app composer:2 vendor/bin/phpunit` and

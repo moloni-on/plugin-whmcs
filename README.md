@@ -87,7 +87,8 @@ phpcs) can never leak into the shipped zip; pass `./build.sh --skip-install` to 
 vendor/ you already know is prod-only. Every push and pull request runs
 [.github/workflows/ci.yml](.github/workflows/ci.yml) (phpcs + PHPUnit on PHP 7.4/8.1/8.2);
 pushing a `v*` tag runs [.github/workflows/release.yml](.github/workflows/release.yml), which
-builds that zip and attaches it to a GitHub Release.
+re-runs those same phpcs + PHPUnit checks before building (a tag on a red commit fails the
+release rather than publishing), then builds that zip and attaches it to a GitHub Release.
 
 ## Documentation
 

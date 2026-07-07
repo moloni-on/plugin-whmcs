@@ -1,8 +1,9 @@
 name: CI
 
 # Lint (PSR-12) and test on every push and pull request so regressions and
-# style violations are caught before they reach main — the release workflow only
-# runs on tags and does neither.
+# style violations are caught before they reach main. The release workflow
+# (tags only) re-runs these same checks before building, so a tag on a red
+# commit can't publish.
 on:
   push:
     branches: ['**']
