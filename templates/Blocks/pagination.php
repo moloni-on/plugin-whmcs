@@ -10,7 +10,7 @@
  * @var callable                    $lang
  * @var callable                    $url
  * @var callable                    $e
- * @var \Moloni\Support\Paginator   $paginator
+ * @var \MoloniOn\Support\Paginator   $paginator
  * @var array<string,string|int>    $baseParams query params to preserve in links
  * @var string                      $pageParam  name of the page query parameter
  */

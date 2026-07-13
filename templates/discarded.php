@@ -9,7 +9,7 @@
  * @var callable $orderUrl
  * @var callable $money
  * @var array<int,object> $discarded
- * @var \Moloni\Support\Paginator $discardedPagination
+ * @var \MoloniOn\Support\Paginator $discardedPagination
  */
 ?>
 <div class="moloni-on__panel">

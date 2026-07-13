@@ -8,7 +8,7 @@
  * @var callable $postForm
  * @var callable $paginate
  * @var array<int,object> $logs
- * @var \Moloni\Support\Paginator $logsPagination
+ * @var \MoloniOn\Support\Paginator $logsPagination
  * @var array<string,string|int> $logFilters
  */
 $levels = ['', 'debug', 'info', 'notice', 'warning', 'error', 'critical'];

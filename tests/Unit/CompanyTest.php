@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Moloni\Tests\Unit;
+namespace MoloniOn\Tests\Unit;
 
-use Moloni\Support\Company;
+use MoloniOn\Support\Company;
 use PHPUnit\Framework\TestCase;
 
 final class CompanyTest extends TestCase

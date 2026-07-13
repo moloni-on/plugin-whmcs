@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Moloni\Tests\Unit;
+namespace MoloniOn\Tests\Unit;
 
-use Moloni\Support\CurrencyExchange;
+use MoloniOn\Support\CurrencyExchange;
 use PHPUnit\Framework\TestCase;
 
 final class CurrencyExchangeTest extends TestCase

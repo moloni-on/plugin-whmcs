@@ -22,12 +22,12 @@
   },
   "autoload": {
     "psr-4": {
-      "Moloni\\": "src/Moloni/"
+      "MoloniOn\\": "src/MoloniOn/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "Moloni\\Tests\\": "tests/"
+      "MoloniOn\\Tests\\": "tests/"
     }
   },
   "scripts": {

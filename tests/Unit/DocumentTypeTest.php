@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Moloni\Tests\Unit;
+namespace MoloniOn\Tests\Unit;
 
-use Moloni\Enums\DocumentType;
+use MoloniOn\Enums\DocumentType;
 use PHPUnit\Framework\TestCase;
 
 final class DocumentTypeTest extends TestCase

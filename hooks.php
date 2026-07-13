@@ -10,15 +10,15 @@
 
 declare(strict_types=1);
 
-use Moloni\Api\ApiClient;
-use Moloni\Api\MoloniClient;
-use Moloni\Exceptions\SkippedException;
-use Moloni\Facades\LoggerFacade;
-use Moloni\Models\Order;
-use Moloni\Models\Whmcs;
-use Moloni\Services\AuthService;
-use Moloni\Services\DocumentService;
-use Moloni\Services\SettingsService;
+use MoloniOn\Api\ApiClient;
+use MoloniOn\Api\MoloniClient;
+use MoloniOn\Exceptions\SkippedException;
+use MoloniOn\Facades\LoggerFacade;
+use MoloniOn\Models\Order;
+use MoloniOn\Models\Whmcs;
+use MoloniOn\Services\AuthService;
+use MoloniOn\Services\DocumentService;
+use MoloniOn\Services\SettingsService;
 
 if (!defined('WHMCS')) {
     die('This file cannot be accessed directly');

@@ -14,7 +14,7 @@
  * @var callable $orderUrl
  * @var callable $money
  * @var array<int,object> $orders
- * @var \Moloni\Support\Paginator $ordersPagination
+ * @var \MoloniOn\Support\Paginator $ordersPagination
  * @var array<int,string> $documentTypes
  * @var string|null $selectedDocumentType
  */

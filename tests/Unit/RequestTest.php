@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Moloni\Tests\Unit;
+namespace MoloniOn\Tests\Unit;
 
-use Moloni\Support\Request;
+use MoloniOn\Support\Request;
 use PHPUnit\Framework\TestCase;
 
 final class RequestTest extends TestCase

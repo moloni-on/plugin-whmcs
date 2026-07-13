@@ -8,17 +8,17 @@ namespace {
     if (!function_exists('run_hook')) {
         function run_hook(string $hook, array $vars = [])
         {
-            \Moloni\Tests\Unit\HooksTest::$lastHook = $hook;
-            \Moloni\Tests\Unit\HooksTest::$lastVars = $vars;
+            \MoloniOn\Tests\Unit\HooksTest::$lastHook = $hook;
+            \MoloniOn\Tests\Unit\HooksTest::$lastVars = $vars;
 
-            return \Moloni\Tests\Unit\HooksTest::$responses;
+            return \MoloniOn\Tests\Unit\HooksTest::$responses;
         }
     }
 }
 
-namespace Moloni\Tests\Unit {
+namespace MoloniOn\Tests\Unit {
 
-    use Moloni\Support\Hooks;
+    use MoloniOn\Support\Hooks;
     use PHPUnit\Framework\TestCase;
 
     final class HooksTest extends TestCase

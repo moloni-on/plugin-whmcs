@@ -39,7 +39,7 @@ automatically tax-exempt and carries the configured reason.
 ```
 moloni_on.php          WHMCS addon entry (config/activate/deactivate/upgrade/output hooks)
 hooks.php              WHMCS hooks (auto-create document on InvoicePaid)
-src/Moloni/
+src/MoloniOn/
   Admin/               Dispatcher (router) + Container (service factory)
   Api/                 ApiClient (OAuth + GraphQL over cURL), MoloniClient (domain wrapper)
   GraphQL/             One class per query/mutation

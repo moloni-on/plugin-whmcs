@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace Moloni\Tests\Unit;
+namespace MoloniOn\Tests\Unit;
 
-use Moloni\Enums\TaxFiscalZoneType;
-use Moloni\Enums\TaxType;
-use Moloni\GraphQL\Mutations\CreateDocument;
-use Moloni\GraphQL\Mutations\CreateDocumentPdf;
-use Moloni\GraphQL\Mutations\CreatePaymentMethod;
-use Moloni\GraphQL\Mutations\SendDocumentMail;
-use Moloni\GraphQL\Mutations\UpdateCustomer;
-use Moloni\GraphQL\Mutations\UpdateDocumentStatus;
-use Moloni\GraphQL\Queries\GetCompany;
-use Moloni\GraphQL\Queries\GetCurrencyExchanges;
-use Moloni\GraphQL\Queries\GetCustomers;
-use Moloni\GraphQL\Queries\GetDocumentPdfToken;
-use Moloni\GraphQL\Queries\GetDocumentSets;
-use Moloni\GraphQL\Queries\GetMeasurementUnits;
-use Moloni\GraphQL\Queries\GetPaymentMethods;
-use Moloni\GraphQL\Queries\GetProductCategories;
-use Moloni\GraphQL\Queries\GetProducts;
-use Moloni\GraphQL\Queries\GetTaxes;
+use MoloniOn\Enums\TaxFiscalZoneType;
+use MoloniOn\Enums\TaxType;
+use MoloniOn\GraphQL\Mutations\CreateDocument;
+use MoloniOn\GraphQL\Mutations\CreateDocumentPdf;
+use MoloniOn\GraphQL\Mutations\CreatePaymentMethod;
+use MoloniOn\GraphQL\Mutations\SendDocumentMail;
+use MoloniOn\GraphQL\Mutations\UpdateCustomer;
+use MoloniOn\GraphQL\Mutations\UpdateDocumentStatus;
+use MoloniOn\GraphQL\Queries\GetCompany;
+use MoloniOn\GraphQL\Queries\GetCurrencyExchanges;
+use MoloniOn\GraphQL\Queries\GetCustomers;
+use MoloniOn\GraphQL\Queries\GetDocumentPdfToken;
+use MoloniOn\GraphQL\Queries\GetDocumentSets;
+use MoloniOn\GraphQL\Queries\GetMeasurementUnits;
+use MoloniOn\GraphQL\Queries\GetPaymentMethods;
+use MoloniOn\GraphQL\Queries\GetProductCategories;
+use MoloniOn\GraphQL\Queries\GetProducts;
+use MoloniOn\GraphQL\Queries\GetTaxes;
 use PHPUnit\Framework\TestCase;
 
 final class GraphQLOperationsTest extends TestCase

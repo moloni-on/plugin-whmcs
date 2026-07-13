@@ -134,7 +134,7 @@ function moloni_on_deactivate() {
 
 ### 3. Service Layer (Business Logic)
 
-**Directory:** `/src/Moloni/Services/`
+**Directory:** `/src/MoloniOn/Services/`
 
 **Responsibilities:**
 - Implement business logic
@@ -238,7 +238,7 @@ class SettingsService {
 
 ### 4. API/Client Layer
 
-**Directory:** `/src/Moloni/Api/`
+**Directory:** `/src/MoloniOn/Api/`
 
 **Responsibilities:**
 - Handle HTTP requests to Moloni ON
@@ -298,11 +298,11 @@ class MoloniClient {
 
 #### GraphQL Query Builder
 
-**Directory:** `/src/Moloni/GraphQL/`
+**Directory:** `/src/MoloniOn/GraphQL/`
 
 **Pattern:**
 ```php
-namespace Moloni\GraphQL\Queries;
+namespace MoloniOn\GraphQL\Queries;
 
 class CreateDocument {
     private $query = <<<'GRAPHQL'
@@ -343,7 +343,7 @@ class CreateDocument {
 
 ### 5. Model/Database Layer
 
-**Directory:** `/src/Moloni/Models/`
+**Directory:** `/src/MoloniOn/Models/`
 
 **Responsibilities:**
 - Represent data entities
@@ -405,7 +405,7 @@ class Config extends AbstractModel {
 
 ### 6. Exception Handling
 
-**Directory:** `/src/Moloni/Exceptions/`
+**Directory:** `/src/MoloniOn/Exceptions/`
 
 **Hierarchy:**
 ```

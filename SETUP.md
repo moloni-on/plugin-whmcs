@@ -136,10 +136,10 @@ The module installs tables on first activation:
    ```
 
 ### 2b. Automate Table Creation (Optional)
-Create `/src/Moloni/Database/Installer.php`:
+Create `/src/MoloniOn/Database/Installer.php`:
 ```php
 <?php
-namespace Moloni\Database;
+namespace MoloniOn\Database;
 
 class Installer {
     public static function install() {
@@ -255,13 +255,13 @@ chmod +x .git/hooks/pre-commit
 
 ## Step 7: GraphQL Operations
 
-Each GraphQL operation is a PHP class under `/src/Moloni/GraphQL/` extending
+Each GraphQL operation is a PHP class under `/src/MoloniOn/GraphQL/` extending
 `AbstractOperation`. The GraphQL document lives in the `QUERY` constant; `operation()`
 returns the root field name (used to locate `data`/`errors` in the response) and
 `variables($data)` builds the payload.
 
 ```
-/src/Moloni/GraphQL/
+/src/MoloniOn/GraphQL/
 ├── Queries/    GetCompanies, GetCompany, GetCustomers, GetDocument,
 │               GetDocumentSets, GetCountries, GetProducts, GetTaxes, ...
 └── Mutations/  CreateCustomer, CreateDocument, UpdateDocumentStatus,
@@ -270,9 +270,9 @@ returns the root field name (used to locate `data`/`errors` in the response) and
 
 ```php
 <?php
-namespace Moloni\GraphQL\Queries;
+namespace MoloniOn\GraphQL\Queries;
 
-use Moloni\GraphQL\AbstractOperation;
+use MoloniOn\GraphQL\AbstractOperation;
 
 class GetCountries extends AbstractOperation
 {
@@ -287,7 +287,7 @@ class GetCountries extends AbstractOperation
 > Queries are embedded as PHP string constants (not separate `.graphql` files), so IDE
 > GraphQL schema autocomplete is not available for them by design.
 
-Endpoint and OAuth constants live in `src/Moloni/Support/Platform.php`
+Endpoint and OAuth constants live in `src/MoloniOn/Support/Platform.php`
 (`API_URL = https://api.molonion.pt/v1`); there is no `.env` file.
 
 ---

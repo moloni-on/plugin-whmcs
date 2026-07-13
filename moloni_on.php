@@ -11,10 +11,10 @@
 
 declare(strict_types=1);
 
-use Moloni\Admin\Container;
-use Moloni\Admin\Dispatcher;
-use Moloni\Database\Installer;
-use Moloni\Support\Platform;
+use MoloniOn\Admin\Container;
+use MoloniOn\Admin\Dispatcher;
+use MoloniOn\Database\Installer;
+use MoloniOn\Support\Platform;
 use WHMCS\Config\Setting;
 
 if (!defined('WHMCS')) {

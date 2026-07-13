@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Moloni\Tests\Unit;
+namespace MoloniOn\Tests\Unit;
 
-use Moloni\Support\Lang;
+use MoloniOn\Support\Lang;
 use PHPUnit\Framework\TestCase;
 
 final class LangTest extends TestCase

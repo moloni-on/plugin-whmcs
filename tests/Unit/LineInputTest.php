@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Moloni\Tests\Unit;
+namespace MoloniOn\Tests\Unit;
 
-use Moloni\Support\LineInput;
+use MoloniOn\Support\LineInput;
 use PHPUnit\Framework\TestCase;
 
 final class LineInputTest extends TestCase
