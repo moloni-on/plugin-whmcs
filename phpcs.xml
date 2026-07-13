@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<ruleset name="MoloniON">
+    <description>PSR-12 coding standard for the Moloni ON WHMCS module.</description>
+
+    <file>src</file>
+    <file>tests</file>
+    <file>moloni_on.php</file>
+    <file>hooks.php</file>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <rule ref="PSR12"/>
+
+    <!-- WHMCS addon entry files must both declare hook functions and require the
+         autoloader, which unavoidably mixes symbol declaration with side effects. -->
+    <rule ref="PSR1.Files.SideEffects.FoundWithSymbols">
+        <exclude-pattern>moloni_on.php</exclude-pattern>
+        <exclude-pattern>hooks.php</exclude-pattern>
+    </rule>
+
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/public/*</exclude-pattern>
+</ruleset>

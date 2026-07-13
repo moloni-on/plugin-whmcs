@@ -1,0 +1,41 @@
+name: CI
+
+# Lint (PSR-12) and test on every push and pull request so regressions and
+# style violations are caught before they reach main. The release workflow
+# (tags only) re-runs these same checks before building, so a tag on a red
+# commit can't publish.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cover the supported range: the composer floor (7.4) through the
+        # versions WHMCS actually runs on.
+        php-version: ['7.4', '8.1', '8.2']
+    name: PHP ${{ matrix.php-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: curl, json, mbstring
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Lint (PSR-12)
+        run: composer lint
+
+      - name: Test
+        run: composer test

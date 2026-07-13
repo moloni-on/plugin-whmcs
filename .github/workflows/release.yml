@@ -1,0 +1,48 @@
+name: Release
+
+# Build and publish the addon package when a version tag is created.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          extensions: curl, json, mbstring
+          tools: composer:v2
+          coverage: none
+
+      # Gate the release on the same checks CI runs: a tag on a red commit must
+      # not build and publish. These need the dev tooling (phpcs, PHPUnit), so
+      # install with dev deps here...
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Lint (PSR-12)
+        run: composer lint
+
+      - name: Test
+        run: composer test
+
+      # ...then let build.sh do its own fresh --no-dev install, so the dev
+      # tooling installed above never ends up in the shipped package.
+      - name: Build package
+        run: bash build.sh
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/moloni_on.zip
+          generate_release_notes: true
