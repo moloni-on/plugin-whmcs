@@ -18,8 +18,8 @@ class GetCurrencyExchanges extends AbstractOperation
     protected const OPERATION = 'currencyExchanges';
 
     protected const QUERY = <<<'GRAPHQL'
-    query currencyExchanges($companyId: Int!, $options: CurrencyExchangeOptions) {
-        currencyExchanges(companyId: $companyId, options: $options) {
+    query currencyExchanges($options: CurrencyExchangeOptions) {
+        currencyExchanges(options: $options) {
             data {
                 currencyExchangeId
                 exchange

@@ -192,6 +192,9 @@ final class GraphQLOperationsTest extends TestCase
         self::assertSame(['field' => 'pair', 'value' => 'EUR USD'], $variables['options']['search']);
         // The API rejects list queries without pagination, so it is always sent.
         self::assertSame(['page' => 1, 'qty' => 50], $variables['options']['pagination']);
+        // currencyExchanges is a global query — it has no companyId argument, so
+        // the document must not declare or pass one (the API rejects it otherwise).
+        self::assertStringNotContainsString('companyId', $op->query());
     }
 
     public function testUpdateCustomerWrapsData(): void
