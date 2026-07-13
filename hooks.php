@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 use Moloni\Api\ApiClient;
 use Moloni\Api\MoloniClient;
+use Moloni\Exceptions\SkippedException;
 use Moloni\Facades\LoggerFacade;
 use Moloni\Models\Order;
 use Moloni\Models\Whmcs;
@@ -26,26 +27,50 @@ if (!defined('WHMCS')) {
 require_once __DIR__ . '/vendor/autoload.php';
 
 add_hook('InvoicePaid', 1, static function (array $vars): void {
+    $invoiceId = (int) ($vars['invoiceid'] ?? 0);
+
     try {
         $settings = new SettingsService();
 
+        // Auto-create disabled: stay silent — this hook fires on every paid
+        // invoice, so logging here would be pure noise for installs that don't
+        // want automatic documents.
         if (!$settings->autoCreate()) {
             return;
         }
 
-        $invoiceId = (int) ($vars['invoiceid'] ?? 0);
+        // From here on, every exit path leaves a log line: the auto-create hook
+        // must never be a silent black box (it is the only clue when a paid
+        // order does not turn into a document). See journal 039.
         $order = $invoiceId > 0 ? Whmcs::getOrderByInvoice($invoiceId) : null;
 
         if ($order === null) {
+            LoggerFacade::info(
+                'Auto-create skipped: paid invoice is not linked to a WHMCS order.',
+                ['invoice_id' => $invoiceId]
+            );
+
             return;
         }
 
         $orderId = (int) $order->id;
 
+        LoggerFacade::info(
+            'Auto-create triggered by paid invoice.',
+            ['invoice_id' => $invoiceId, 'order_id' => $orderId],
+            $orderId
+        );
+
         // Skip orders already handled (synced or explicitly discarded).
         $tracked = Order::findByOrderId($orderId);
 
         if ($tracked !== null && in_array($tracked->status, [Order::STATUS_SYNCED, Order::STATUS_DISCARDED], true)) {
+            LoggerFacade::info(
+                'Auto-create skipped: order already ' . $tracked->status . '.',
+                ['invoice_id' => $invoiceId, 'order_id' => $orderId],
+                $orderId
+            );
+
             return;
         }
 
@@ -64,7 +89,15 @@ add_hook('InvoicePaid', 1, static function (array $vars): void {
         $auth->loadCompany();
 
         (new DocumentService($moloni, $settings))->createDocumentFromOrder($orderId);
+    } catch (SkippedException $e) {
+        // Not a failure: the order was intentionally not billed (e.g. no
+        // invoice items / mass-payment invoice). DocumentService already marked
+        // it discarded and logged the reason; record it here too, at info.
+        LoggerFacade::info('Auto-create skipped: ' . $e->getMessage(), ['invoice_id' => $invoiceId]);
     } catch (Throwable $e) {
-        LoggerFacade::error('Automatic document creation failed.', ['error' => $e->getMessage()]);
+        LoggerFacade::error(
+            'Automatic document creation failed.',
+            ['invoice_id' => $invoiceId, 'error' => $e->getMessage()]
+        );
     }
 });

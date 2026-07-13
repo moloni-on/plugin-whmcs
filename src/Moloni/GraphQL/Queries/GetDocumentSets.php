@@ -19,7 +19,6 @@ class GetDocumentSets extends AbstractOperation
             data {
                 documentSetId
                 name
-                isDefault
             }
             errors {
                 field
