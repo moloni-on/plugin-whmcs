@@ -65,7 +65,7 @@ class Dispatcher
      */
     public function dispatch(): string
     {
-        Lang::boot((string) ($this->vars['adminLanguage'] ?? 'english') === 'portuguese' ? 'pt' : 'en');
+        Lang::boot(Whmcs::adminLanguage());
 
         $action = $this->request->query('action');
         $op = $this->request->request('op');

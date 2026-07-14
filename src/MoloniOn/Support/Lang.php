@@ -22,11 +22,23 @@ final class Lang
 
     public static function boot(string $language = 'en'): void
     {
-        $language = strtolower(substr($language, 0, 2)) === 'pt' ? 'pt' : 'en';
-
-        self::$language = $language;
+        self::$language = self::isPortuguese($language) ? 'pt' : 'en';
         self::$loaded = false;
         self::$strings = [];
+    }
+
+    /**
+     * Whether a language identifier denotes Portuguese. Accepts ISO-ish codes
+     * ("pt", "pt-PT"), WHMCS language names ("portuguese", "portuguese-pt",
+     * "portuguese-br") and non-standard slugs seen on real installs
+     * ("portugues", "português"). Matched on the "portug" stem so all spellings
+     * resolve, with or without the trailing "e"/accent.
+     */
+    private static function isPortuguese(string $language): bool
+    {
+        $language = strtolower($language);
+
+        return strncmp($language, 'pt', 2) === 0 || strpos($language, 'portug') !== false;
     }
 
     public static function language(): string

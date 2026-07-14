@@ -44,4 +44,39 @@ final class LangTest extends TestCase
 
         self::assertSame('en', Lang::language());
     }
+
+    /**
+     * @dataProvider portugueseIdentifiers
+     */
+    public function testResolvesPortugueseIdentifiers(string $identifier): void
+    {
+        Lang::boot($identifier);
+
+        self::assertSame('pt', Lang::language());
+    }
+
+    /**
+     * @return array<int,array{0:string}>
+     */
+    public function portugueseIdentifiers(): array
+    {
+        return [
+            ['pt'],
+            ['pt-PT'],
+            ['portuguese'],
+            ['portuguese-pt'],
+            ['portuguese-br'],
+            ['Portuguese-PT'],
+            ['portugues'],
+            ['Portugues'],
+            ['português'],
+        ];
+    }
+
+    public function testEmptyLanguageDefaultsToEnglish(): void
+    {
+        Lang::boot('');
+
+        self::assertSame('en', Lang::language());
+    }
 }

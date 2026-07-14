@@ -15,6 +15,31 @@ use WHMCS\Database\Capsule;
 class Whmcs
 {
     /**
+     * The current admin's language name (e.g. "portuguese-pt", "portugues"),
+     * or "" if it cannot be resolved. WHMCS does not pass this to addon module
+     * output, so it is read from the session admin id against tbladmins. When
+     * the admin has no explicit choice (the "Default" preference leaves the
+     * column empty), it falls back to the system default language from
+     * tblconfiguration — that is the language such an admin actually sees.
+     */
+    public static function adminLanguage(): string
+    {
+        $adminId = (int) ($_SESSION['adminid'] ?? 0);
+
+        if ($adminId > 0) {
+            $language = Capsule::table('tbladmins')->where('id', $adminId)->value('language');
+
+            if (is_string($language) && $language !== '') {
+                return $language;
+            }
+        }
+
+        $default = Capsule::table('tblconfiguration')->where('setting', 'Language')->value('value');
+
+        return is_string($default) ? $default : '';
+    }
+
+    /**
      * @return object|null
      */
     public static function getOrder(int $orderId)
