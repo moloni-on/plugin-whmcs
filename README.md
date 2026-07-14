@@ -1,99 +1,61 @@
-# Moloni ON for WHMCS
+<div align="center">
 
-A WHMCS addon module that syncs WHMCS orders into [Moloni ON](https://www.molonion.pt/)
-(a Portuguese invoicing platform) as invoices/documents, via its GraphQL API.
+# 🧾 Moloni ON for WHMCS
 
-- Authenticate with Moloni ON (OAuth2) and pick a company
-- Turn WHMCS orders into Moloni ON documents — individually, in bulk, or automatically when an invoice is paid
-- Taxes, customer and products are derived from the order and resolved/created in Moloni ON
-- Download document PDFs, discard/revert orders, and review an activity log
+**Turn your WHMCS orders into legal invoices in [Moloni ON](https://www.molonion.pt/) —
+Portugal's cloud invoicing platform — without re-typing anything or missing a document.**
 
-## Requirements
+</div>
 
-- WHMCS 7.0+
-- PHP 7.4+ (with `curl`, `json`, `mbstring`)
-- Composer
-- A Moloni ON account with API credentials (API Client ID + Client Secret)
+---
 
-## Install
+## ✨ What it does
 
-```bash
-composer install --no-dev --optimize-autoloader
-# copy this directory to your WHMCS install as modules/addons/moloni_on
-```
+- 🔐 **Connects WHMCS to your Moloni ON account** through a secure sign-in, and lets you
+  choose which company to bill from.
+- ⚡ **Creates invoices from your orders** — one at a time, in bulk, or fully automatically
+  the moment a WHMCS invoice is marked as paid.
+- 🪄 **Fills in the details for you** — customers, products, taxes, payment method and
+  currency are read from each order and matched to (or created in) your Moloni ON account.
+- 🇵🇹 **Keeps documents fiscally correct** — VAT rates, tax-exemption reasons, multi-currency
+  conversion and Portuguese postcode formatting are all handled for you.
+- 🎛️ **Keeps you in control** — download the official PDF, e-mail it to the customer, discard
+  or revert an order, and review a full activity log of everything the module has done.
 
-Then activate **Moloni ON** under *Setup → Addon Modules* in the WHMCS admin and open it
-from *Addons → Moloni ON*. Full step-by-step (DB tables, OAuth, settings) is in
-[SETUP.md](SETUP.md).
+## ✅ Requirements
 
-## Configuration
+- 🟢 WHMCS **7.0 or newer**
+- 🐘 PHP **7.4+** with the `curl`, `json` and `mbstring` extensions
+- 🔑 A Moloni ON account with **API credentials** (API Client ID + Client Secret)
 
-Settings live under the module's *Settings* tab: default document type & status, document set,
-tax-exemption reason, automatic creation on payment, and product-mapping defaults (measurement
-unit, category — chosen from dropdowns fetched live from Moloni ON). Document VAT is taken from
-each order's own tax rate — not a fixed setting. Any line that resolves to no VAT is
-automatically tax-exempt and carries the configured reason.
+## 🚀 Installing
 
-## Project structure
+1. 📂 Copy the module into your WHMCS install at `modules/addons/moloni_on`.
+2. 🧩 Activate **Moloni ON** under *Setup → Addon Modules*.
+3. 🔓 Open it from *Addons → Moloni ON* and sign in to your Moloni ON account.
 
-```
-moloni_on.php          WHMCS addon entry (config/activate/deactivate/upgrade/output hooks)
-hooks.php              WHMCS hooks (auto-create document on InvoicePaid)
-src/MoloniOn/
-  Admin/               Dispatcher (router) + Container (service factory)
-  Api/                 ApiClient (OAuth + GraphQL over cURL), MoloniClient (domain wrapper)
-  GraphQL/             One class per query/mutation
-  Services/            DocumentService, OrderService, AuthService, SettingsService, LogService,
-                       CountryResolver, CustomerResolver, ProductResolver, TaxResolver,
-                       LineMapper, PaymentResolver
-  Models/              Config, Auth, Order, Document, Log + Whmcs (native-table reads)
-  Support/             Platform, Context, Company, Lang, Template, Request, FiscalZone, LineInput
-  Enums/ Exceptions/ Facades/
-templates/             UI pages + Blocks/ (shared layout)
-lang/                  en.php, pt.php
-public/                css/js
-tests/                 PHPUnit (Unit, Feature)
-```
+> 📖 The full step-by-step guide — including OAuth setup and the exact settings to choose —
+> is in **[SETUP.md](SETUP.md)**.
 
-## Development
+## ⚙️ Configuring
 
-No PHP is required locally — use the Docker Compose `tools` service:
+Everything is configured from the module's **Settings** tab:
 
-```bash
-docker compose run --rm tools install   # composer install
-docker compose run --rm tools test      # PHPUnit
-docker compose run --rm tools lint      # PHP CodeSniffer (PSR-12)
-docker compose run --rm tools build     # package -> dist/moloni_on.zip
-```
+- 📄 default **document type** and **status**, and the **document set**
+- 🧮 the **tax-exemption reason**
+- 🤖 whether documents are created **automatically** when an invoice is paid
+- 📧 whether they are **e-mailed** to the customer
+- 📦 **product-mapping** defaults such as measurement unit and category (picked from
+  dropdowns loaded live from your Moloni ON account)
 
-Inside a PHP environment the same runs as `composer test` / `lint` / `lint:fix` / `build`.
+> 💡 VAT is never a fixed setting — it is taken from **each order's own tax rate**. Any line
+> that resolves to no VAT is automatically treated as tax-exempt, using the reason you choose.
 
-### Full WHMCS runtime (optional)
+## 📚 Documentation
 
-WHMCS is proprietary and can't be pulled from a registry, so download your licensed release
-into `./whmcs`, then start the `whmcs` profile (php-apache + MariaDB, addon mounted live):
+- 🛠️ **[SETUP.md](SETUP.md)** — installation, OAuth, and deployment checklist
+- 👩‍💻 **[DEV.md](DEV.md)** — project structure, building the module, and contributing
 
-```bash
-docker compose --profile whmcs up -d      # WHMCS at http://localhost:8080
-```
-
-WHMCS needs the ionCube Loader — see [docker/whmcs.Dockerfile](docker/whmcs.Dockerfile).
-
-## Build / release
-
-`composer build` (or `./build.sh`) produces `dist/moloni_on.zip` (module + prod dependencies)
-ready to install. It always runs a fresh `--no-dev` install first, so dev tooling (PHPUnit,
-phpcs) can never leak into the shipped zip; pass `./build.sh --skip-install` to reuse a
-vendor/ you already know is prod-only. Every push and pull request runs
-[.github/workflows/ci.yml](.github/workflows/ci.yml) (phpcs + PHPUnit on PHP 7.4/8.1/8.2);
-pushing a `v*` tag runs [.github/workflows/release.yml](.github/workflows/release.yml), which
-re-runs those same phpcs + PHPUnit checks before building (a tag on a red commit fails the
-release rather than publishing), then builds that zip and attaches it to a GitHub Release.
-
-## Documentation
-
-- [SETUP.md](SETUP.md) — installation, OAuth, database, deployment checklist
-- [ARCHITECTURE.md](ARCHITECTURE.md) — layered design, data flow, DB schema
-- [CLAUDE.md](CLAUDE.md) — repository guide and conventions
-- [.claude/PROJECT_PLAN.md](.claude/PROJECT_PLAN.md) — phased implementation checklist
-- [.claude/journal/](.claude/journal/) — decisions & progress notes
+<div align="center">
+<sub>Made for Portuguese hosting businesses running WHMCS 💙</sub>
+</div>

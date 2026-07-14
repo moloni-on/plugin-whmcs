@@ -14,7 +14,8 @@ A **WHMCS addon module for Moloni ON** — syncs WHMCS orders into [Moloni ON](h
 
 | Doc | Purpose |
 |-----|---------|
-| [README.md](README.md) | Overview, install, structure, dev/build |
+| [README.md](README.md) | Customer-facing plugin overview (what it does, requirements, quick install, config summary) |
+| [DEV.md](DEV.md) | Developer docs: project structure, Docker tooling, WHMCS runtime, build/release |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Layered system design, services, models, data flow, DB schema |
 | [SETUP.md](SETUP.md) | Install/config guide, DB table DDL, deployment checklist |
 | [.claude/PROJECT_PLAN.md](.claude/PROJECT_PLAN.md) | Phased implementation checklist with acceptance criteria |
