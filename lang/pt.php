@@ -81,7 +81,7 @@ return [
 
     // Configurações
     'settings_title' => 'As tuas configurações',
-    'settings_document_defaults' => 'Definições do documento',
+    'settings_document_defaults' => 'Configurações do documento',
     'settings_document_defaults_help' => 'Que tipo de documento criar no Moloni ON e como é emitido.',
     'settings_automation' => 'Automação',
     'settings_automation_help' => 'Quando os documentos são criados automaticamente e o que acontece depois.',
@@ -98,8 +98,8 @@ return [
     'setting_send_email' => 'Enviar o documento por e-mail ao cliente depois de criado',
     'setting_send_email_help' => 'Só se aplica quando o estado do documento é Fechado; os rascunhos nunca são enviados por e-mail.',
     'setting_option_none' => '— Nenhuma —',
-    'settings_product_mapping' => 'Definições de mapeamento de produtos',
-    'settings_product_mapping_help' => 'Definições usadas ao criar produtos no Moloni ON para as linhas da encomenda. Os impostos são obtidos automaticamente da taxa de IVA de cada encomenda.',
+    'settings_product_mapping' => 'Configurações dos produtos',
+    'settings_product_mapping_help' => 'Configurações usadas ao criar produtos no Moloni ON para as linhas da encomenda. Os impostos são obtidos automaticamente da taxa de IVA de cada encomenda.',
     'setting_measurement_unit' => 'Unidade de medida',
     'setting_product_category' => 'Categoria de produto',
     'setting_custom_reference' => 'Campo personalizado da referência do produto',
