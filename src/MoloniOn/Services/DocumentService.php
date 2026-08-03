@@ -250,14 +250,18 @@ class DocumentService
     private function buildDocumentPayload($order, $invoice, array $items, string $documentType): array
     {
         $client = $order->userid ? Whmcs::getClient((int) $order->userid) : null;
-        $fiscalZone = $this->resolveFiscalZone($client);
+        // The document header always carries the company's own fiscal zone; only
+        // the line taxes follow the "fiscal zone based on" setting (which may
+        // resolve to the client's billing zone). See resolveTaxFiscalZone().
+        $documentFiscalZone = $this->companyFiscalZone();
+        $taxFiscalZone = $this->resolveTaxFiscalZone($client);
         $exchange = $this->currency->resolve($client);
         $now = date('Y-m-d H:i:s');
 
         $payload = [
             'customerId' => $this->customers->resolve($client),
             'documentSetId' => $this->settings->documentSetId(),
-            'fiscalZone' => $fiscalZone->code(),
+            'fiscalZone' => $documentFiscalZone->code(),
             'date' => $now,
             'expirationDate' => $this->expirationDate($invoice, $now),
             // Always create as draft; the document is only closed afterwards
@@ -271,7 +275,7 @@ class DocumentService
             'products' => $this->resolveProductLines(
                 $items,
                 $invoice,
-                $fiscalZone,
+                $taxFiscalZone,
                 (int) $order->invoiceid,
                 $exchange
             ),
@@ -730,14 +734,16 @@ class DocumentService
     }
 
     /**
-     * The document fiscal zone (code + countryId), honouring the
+     * The fiscal zone (code + countryId) used to resolve line VAT, honouring the
      * "fiscal zone based on" setting. When set to the client's billing country,
      * the zone follows that country; it falls back to the company zone whenever
-     * the client has no usable country.
+     * the client has no usable country. This drives the line taxes only — the
+     * document header always carries the company fiscal zone (see
+     * buildDocumentPayload / companyFiscalZone).
      *
      * @param object|null $client tblclients row
      */
-    private function resolveFiscalZone($client): FiscalZone
+    private function resolveTaxFiscalZone($client): FiscalZone
     {
         $company = $this->companyFiscalZone();
 
