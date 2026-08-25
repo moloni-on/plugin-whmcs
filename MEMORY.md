@@ -1,2 +1,5 @@
-- [Moloni ON API auth](../../.claude/projects/-home-fabio-plugin-dev-plugin-whmcs/memory/moloni-on-api-auth.md) — real auth is OAuth2 (dev_id+secret→code→tokens), endpoint /v1, NOT the API-key described in planning docs
-- [Reference plugins location](../../.claude/projects/-home-fabio-plugin-dev-plugin-whmcs/memory/reference-plugins-location.md) — Moloni reference plugins live in ~/ (above project); authoritative for API schema + WHMCS structure
+# MEMORY.md
+
+Durable, non-obvious facts about this repository. Self-contained notes — no external/local paths.
+
+- **Moloni ON API auth is OAuth2**, not a static API key: authorization-code flow — API client id + secret → authorize redirect → grant → access/refresh tokens; API base is `/v1`. The original planning docs described an API-key model, which was wrong. See the authentication notes in `AGENTS.md` and `src/MoloniOn/Services/AuthService.php` / `src/MoloniOn/Api/ApiClient.php`.
