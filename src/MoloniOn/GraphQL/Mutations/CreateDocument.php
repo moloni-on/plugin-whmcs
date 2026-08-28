@@ -24,9 +24,10 @@ class CreateDocument extends AbstractOperation
     {
         $this->operation = $documentType . 'Create';
         $inputType = ucfirst($documentType) . 'Insert';
+        $operationLabel = 'whmcs' . ucfirst($this->operation);
 
         $this->query = <<<GRAPHQL
-        mutation whmcsCreateDocument {$this->operation}(\$companyId: Int!, \$data: {$inputType}!) {
+        mutation {$operationLabel}(\$companyId: Int!, \$data: {$inputType}!) {
             {$this->operation}(companyId: \$companyId, data: \$data) {
                 data {
                     documentId

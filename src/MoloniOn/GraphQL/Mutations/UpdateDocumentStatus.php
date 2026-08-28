@@ -22,9 +22,10 @@ class UpdateDocumentStatus extends AbstractOperation
     {
         $this->operation = $documentType . 'Update';
         $inputType = ucfirst($documentType) . 'Update';
+        $operationLabel = 'whmcs' . ucfirst($this->operation);
 
         $this->query = <<<GRAPHQL
-        mutation whmcsUpdateDocumentStatus {$this->operation}(\$companyId: Int!, \$data: {$inputType}!) {
+        mutation {$operationLabel}(\$companyId: Int!, \$data: {$inputType}!) {
             {$this->operation}(companyId: \$companyId, data: \$data) {
                 data {
                     documentId

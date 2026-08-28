@@ -26,9 +26,10 @@ class CreateDocumentPdf extends AbstractOperation
     public function __construct(string $documentType = 'invoice')
     {
         $this->operationName = $documentType . 'GetPDF';
+        $operationLabel = 'whmcs' . ucfirst($this->operationName);
 
         $this->query = <<<GRAPHQL
-        mutation whmcsCreateDocumentPdf {$this->operationName}(\$companyId: Int!, \$documentId: Int!) {
+        mutation {$operationLabel}(\$companyId: Int!, \$documentId: Int!) {
             {$this->operationName}(companyId: \$companyId, documentId: \$documentId)
         }
         GRAPHQL;
