@@ -18,7 +18,7 @@ class GetCurrencyExchanges extends AbstractOperation
     protected const OPERATION = 'currencyExchanges';
 
     protected const QUERY = <<<'GRAPHQL'
-    query currencyExchanges($options: CurrencyExchangeOptions) {
+    query whmcsCurrencyExchanges($options: CurrencyExchangeOptions) {
         currencyExchanges(options: $options) {
             data {
                 currencyExchangeId

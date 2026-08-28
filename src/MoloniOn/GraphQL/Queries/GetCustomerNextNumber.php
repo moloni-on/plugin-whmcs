@@ -15,7 +15,7 @@ class GetCustomerNextNumber extends AbstractOperation
     protected const OPERATION = 'customerNextNumber';
 
     protected const QUERY = <<<'GRAPHQL'
-    query customerNextNumber($companyId: Int!, $options: GetNextCustomerNumberOptions) {
+    query whmcsCustomerNextNumber($companyId: Int!, $options: GetNextCustomerNumberOptions) {
         customerNextNumber(companyId: $companyId, options: $options) {
             data
             errors {

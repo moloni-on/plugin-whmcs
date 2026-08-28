@@ -14,7 +14,7 @@ class GetDocumentSets extends AbstractOperation
     protected const OPERATION = 'documentSets';
 
     protected const QUERY = <<<'GRAPHQL'
-    query documentSets($companyId: Int!, $options: DocumentSetOptions) {
+    query whmcsDocumentSets($companyId: Int!, $options: DocumentSetOptions) {
         documentSets(companyId: $companyId, options: $options) {
             data {
                 documentSetId

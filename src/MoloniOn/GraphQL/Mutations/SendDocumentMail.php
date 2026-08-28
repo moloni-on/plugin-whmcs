@@ -25,7 +25,7 @@ class SendDocumentMail extends AbstractOperation
         $this->operationName = $documentType . 'SendMail';
 
         $this->query = <<<GRAPHQL
-        mutation {$this->operationName}(\$companyId: Int!, \$documents: [Int]!, \$mailData: MailData) {
+        mutation whmcsSendDocumentMail {$this->operationName}(\$companyId: Int!, \$documents: [Int]!, \$mailData: MailData) {
             {$this->operationName}(companyId: \$companyId, documents: \$documents, mailData: \$mailData)
         }
         GRAPHQL;

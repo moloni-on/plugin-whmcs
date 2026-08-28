@@ -17,7 +17,7 @@ class GetTaxes extends AbstractOperation
     protected const OPERATION = 'taxes';
 
     protected const QUERY = <<<'GRAPHQL'
-    query taxes($companyId: Int!, $options: TaxOptions) {
+    query whmcsTaxes($companyId: Int!, $options: TaxOptions) {
         taxes(companyId: $companyId, options: $options) {
             data {
                 taxId

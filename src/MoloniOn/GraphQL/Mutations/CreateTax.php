@@ -15,7 +15,7 @@ class CreateTax extends AbstractOperation
     protected const OPERATION = 'taxCreate';
 
     protected const QUERY = <<<'GRAPHQL'
-    mutation taxCreate($companyId: Int!, $data: TaxInsert!) {
+    mutation whmcsTaxCreate($companyId: Int!, $data: TaxInsert!) {
         taxCreate(companyId: $companyId, data: $data) {
             data {
                 taxId

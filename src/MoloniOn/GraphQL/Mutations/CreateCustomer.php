@@ -14,7 +14,7 @@ class CreateCustomer extends AbstractOperation
     protected const OPERATION = 'customerCreate';
 
     protected const QUERY = <<<'GRAPHQL'
-    mutation customerCreate($companyId: Int!, $data: CustomerInsert!) {
+    mutation whmcsCustomerCreate($companyId: Int!, $data: CustomerInsert!) {
         customerCreate(companyId: $companyId, data: $data) {
             data {
                 customerId

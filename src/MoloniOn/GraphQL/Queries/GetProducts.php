@@ -15,7 +15,7 @@ class GetProducts extends AbstractOperation
     protected const OPERATION = 'products';
 
     protected const QUERY = <<<'GRAPHQL'
-    query products($companyId: Int!, $options: ProductOptions) {
+    query whmcsProducts($companyId: Int!, $options: ProductOptions) {
         products(companyId: $companyId, options: $options) {
             data {
                 productId

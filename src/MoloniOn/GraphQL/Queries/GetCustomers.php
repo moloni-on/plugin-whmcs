@@ -15,7 +15,7 @@ class GetCustomers extends AbstractOperation
     protected const OPERATION = 'customers';
 
     protected const QUERY = <<<'GRAPHQL'
-    query customers($companyId: Int!, $options: CustomerOptions) {
+    query whmcsCustomers($companyId: Int!, $options: CustomerOptions) {
         customers(companyId: $companyId, options: $options) {
             data {
                 customerId

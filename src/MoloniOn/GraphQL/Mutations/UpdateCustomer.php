@@ -14,7 +14,7 @@ class UpdateCustomer extends AbstractOperation
     protected const OPERATION = 'customerUpdate';
 
     protected const QUERY = <<<'GRAPHQL'
-    mutation customerUpdate($companyId: Int!, $data: CustomerUpdate!) {
+    mutation whmcsCustomerUpdate($companyId: Int!, $data: CustomerUpdate!) {
         customerUpdate(companyId: $companyId, data: $data) {
             data {
                 customerId

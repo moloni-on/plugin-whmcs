@@ -26,7 +26,7 @@ class CreateDocument extends AbstractOperation
         $inputType = ucfirst($documentType) . 'Insert';
 
         $this->query = <<<GRAPHQL
-        mutation {$this->operation}(\$companyId: Int!, \$data: {$inputType}!) {
+        mutation whmcsCreateDocument {$this->operation}(\$companyId: Int!, \$data: {$inputType}!) {
             {$this->operation}(companyId: \$companyId, data: \$data) {
                 data {
                     documentId

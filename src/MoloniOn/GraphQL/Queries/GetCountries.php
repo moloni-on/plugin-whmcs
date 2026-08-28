@@ -15,7 +15,7 @@ class GetCountries extends AbstractOperation
     protected const OPERATION = 'countries';
 
     protected const QUERY = <<<'GRAPHQL'
-    query countries($options: CountryOptions) {
+    query whmcsCountries($options: CountryOptions) {
         countries(options: $options) {
             data {
                 countryId

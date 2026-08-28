@@ -14,7 +14,7 @@ class GetDocument extends AbstractOperation
     protected const OPERATION = 'document';
 
     protected const QUERY = <<<'GRAPHQL'
-    query document($companyId: Int!, $documentId: Int!, $options: DocumentOptionsSingle) {
+    query whmcsDocument($companyId: Int!, $documentId: Int!, $options: DocumentOptionsSingle) {
         document(companyId: $companyId, documentId: $documentId, options: $options) {
             data {
                 documentId

@@ -28,7 +28,7 @@ class CreateDocumentPdf extends AbstractOperation
         $this->operationName = $documentType . 'GetPDF';
 
         $this->query = <<<GRAPHQL
-        mutation {$this->operationName}(\$companyId: Int!, \$documentId: Int!) {
+        mutation whmcsCreateDocumentPdf {$this->operationName}(\$companyId: Int!, \$documentId: Int!) {
             {$this->operationName}(companyId: \$companyId, documentId: \$documentId)
         }
         GRAPHQL;

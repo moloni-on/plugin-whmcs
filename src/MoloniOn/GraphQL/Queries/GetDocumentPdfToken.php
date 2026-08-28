@@ -21,7 +21,7 @@ class GetDocumentPdfToken extends AbstractOperation
         $this->operation = $documentType . 'GetPDFToken';
 
         $this->query = <<<GRAPHQL
-        query {$this->operation}(\$documentId: Int!) {
+        query whmcsGetDocumentPdfToken {$this->operation}(\$documentId: Int!) {
             {$this->operation}(documentId: \$documentId) {
                 data {
                     token
