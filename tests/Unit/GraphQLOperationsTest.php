@@ -31,7 +31,7 @@ final class GraphQLOperationsTest extends TestCase
         $op = new CreateDocument();
 
         self::assertSame('invoiceCreate', $op->operation());
-        self::assertStringContainsString('mutation invoiceCreate', $op->query());
+        self::assertStringContainsString('mutation whmcsInvoiceCreate', $op->query());
         self::assertSame(['data' => ['customerId' => 5]], $op->variables(['customerId' => 5]));
     }
 
@@ -92,7 +92,7 @@ final class GraphQLOperationsTest extends TestCase
         $op = new CreateDocumentPdf('proFormaInvoice');
 
         self::assertSame('proFormaInvoiceGetPDF', $op->operation());
-        self::assertStringContainsString('mutation proFormaInvoiceGetPDF', $op->query());
+        self::assertStringContainsString('mutation whmcsProFormaInvoiceGetPDF', $op->query());
         self::assertSame(['documentId' => 55], $op->variables(['documentId' => '55']));
     }
 
