@@ -14,7 +14,7 @@ class GetCompany extends AbstractOperation
     protected const OPERATION = 'company';
 
     protected const QUERY = <<<'GRAPHQL'
-    query company($companyId: Int!, $options: CompanyOptionsSingle) {
+    query whmcsCompany($companyId: Int!, $options: CompanyOptionsSingle) {
         company(companyId: $companyId, options: $options) {
             data {
                 companyId

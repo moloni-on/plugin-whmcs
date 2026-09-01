@@ -23,9 +23,10 @@ class SendDocumentMail extends AbstractOperation
     public function __construct(string $documentType = 'invoice')
     {
         $this->operationName = $documentType . 'SendMail';
+        $operationLabel = 'whmcs' . ucfirst($this->operationName);
 
         $this->query = <<<GRAPHQL
-        mutation {$this->operationName}(\$companyId: Int!, \$documents: [Int]!, \$mailData: MailData) {
+        mutation {$operationLabel}(\$companyId: Int!, \$documents: [Int]!, \$mailData: MailData) {
             {$this->operationName}(companyId: \$companyId, documents: \$documents, mailData: \$mailData)
         }
         GRAPHQL;

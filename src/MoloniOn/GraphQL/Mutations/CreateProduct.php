@@ -20,7 +20,7 @@ class CreateProduct extends AbstractOperation
     protected const OPERATION = 'productCreate';
 
     protected const QUERY = <<<'GRAPHQL'
-    mutation productCreate($companyId: Int!, $data: ProductInsert!) {
+    mutation whmcsProductCreate($companyId: Int!, $data: ProductInsert!) {
         productCreate(companyId: $companyId, data: $data) {
             data {
                 productId

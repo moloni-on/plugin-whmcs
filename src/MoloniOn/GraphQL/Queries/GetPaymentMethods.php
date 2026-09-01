@@ -15,7 +15,7 @@ class GetPaymentMethods extends AbstractOperation
     protected const OPERATION = 'paymentMethods';
 
     protected const QUERY = <<<'GRAPHQL'
-    query paymentMethods($companyId: Int!, $options: PaymentMethodOptions) {
+    query whmcsPaymentMethods($companyId: Int!, $options: PaymentMethodOptions) {
         paymentMethods(companyId: $companyId, options: $options) {
             data {
                 paymentMethodId

@@ -19,9 +19,10 @@ class GetDocumentPdfToken extends AbstractOperation
     public function __construct(string $documentType = 'invoice')
     {
         $this->operation = $documentType . 'GetPDFToken';
+        $operationLabel = 'whmcs' . ucfirst($this->operation);
 
         $this->query = <<<GRAPHQL
-        query {$this->operation}(\$documentId: Int!) {
+        query {$operationLabel}(\$documentId: Int!) {
             {$this->operation}(documentId: \$documentId) {
                 data {
                     token

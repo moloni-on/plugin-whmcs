@@ -14,7 +14,7 @@ class CreatePaymentMethod extends AbstractOperation
     protected const OPERATION = 'paymentMethodCreate';
 
     protected const QUERY = <<<'GRAPHQL'
-    mutation paymentMethodCreate($companyId: Int!, $data: PaymentMethodInsert!) {
+    mutation whmcsPaymentMethodCreate($companyId: Int!, $data: PaymentMethodInsert!) {
         paymentMethodCreate(companyId: $companyId, data: $data) {
             data {
                 paymentMethodId

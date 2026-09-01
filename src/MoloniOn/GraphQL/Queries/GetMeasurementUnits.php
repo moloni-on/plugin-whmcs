@@ -15,7 +15,7 @@ class GetMeasurementUnits extends AbstractOperation
     protected const OPERATION = 'measurementUnits';
 
     protected const QUERY = <<<'GRAPHQL'
-    query measurementUnits($companyId: Int!, $options: MeasurementUnitOptions) {
+    query whmcsMeasurementUnits($companyId: Int!, $options: MeasurementUnitOptions) {
         measurementUnits(companyId: $companyId, options: $options) {
             data {
                 measurementUnitId
