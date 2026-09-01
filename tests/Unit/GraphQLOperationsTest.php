@@ -39,6 +39,8 @@ final class GraphQLOperationsTest extends TestCase
     {
         $op = new UpdateDocumentStatus();
 
+        self::assertStringContainsString('mutation whmcsInvoiceUpdate', $op->query());
+
         $variables = $op->variables(['documentId' => '10', 'status' => '1']);
 
         self::assertSame(['data' => ['documentId' => 10, 'status' => 1]], $variables);
@@ -57,6 +59,7 @@ final class GraphQLOperationsTest extends TestCase
         $op = new GetDocumentPdfToken();
 
         self::assertSame('invoiceGetPDFToken', $op->operation());
+        self::assertStringContainsString('query whmcsInvoiceGetPDFToken', $op->query());
         self::assertSame(['documentId' => 99], $op->variables(['documentId' => 99]));
     }
 
@@ -101,6 +104,7 @@ final class GraphQLOperationsTest extends TestCase
         $op = new SendDocumentMail('simplifiedInvoice');
 
         self::assertSame('simplifiedInvoiceSendMail', $op->operation());
+        self::assertStringContainsString('mutation whmcsSimplifiedInvoiceSendMail', $op->query());
         self::assertStringContainsString('$documents: [Int]!', $op->query());
 
         $variables = $op->variables(['documentId' => '42', 'name' => 'Acme', 'email' => 'a@b.pt']);
@@ -230,5 +234,48 @@ final class GraphQLOperationsTest extends TestCase
         $create = new CreatePaymentMethod();
         self::assertSame('paymentMethodCreate', $create->operation());
         self::assertSame(['data' => ['name' => 'PayPal']], $create->variables(['name' => 'PayPal']));
+    }
+
+    /**
+     * Every GraphQL operation must name itself with the "whmcs" prefix, so this
+     * addon's requests to the Moloni ON API are identifiable by operation name.
+     * The prefix is applied inline in each operation class with nothing else
+     * enforcing it, so this guard fails the build if a new operation is added
+     * without it — or an existing one silently loses it.
+     *
+     * @dataProvider operationClassProvider
+     */
+    public function testEveryOperationNameCarriesThePluginPrefix(string $operationClass): void
+    {
+        $op = new $operationClass();
+
+        self::assertSame(
+            1,
+            preg_match('/\b(?:query|mutation)\s+(\w+)/', $op->query(), $matches),
+            sprintf('%s exposes no named GraphQL operation to verify.', $operationClass)
+        );
+        self::assertStringStartsWith(
+            'whmcs',
+            $matches[1],
+            sprintf('%s must prefix its GraphQL operation name with "whmcs".', $operationClass)
+        );
+    }
+
+    /**
+     * Every concrete operation class under src/MoloniOn/GraphQL/{Queries,Mutations}.
+     *
+     * @return iterable<string,array{class-string}>
+     */
+    public static function operationClassProvider(): iterable
+    {
+        $base = dirname(__DIR__, 2) . '/src/MoloniOn/GraphQL';
+
+        foreach (['Queries', 'Mutations'] as $group) {
+            foreach (glob($base . '/' . $group . '/*.php') ?: [] as $file) {
+                $name = basename($file, '.php');
+
+                yield $group . '\\' . $name => ['MoloniOn\\GraphQL\\' . $group . '\\' . $name];
+            }
+        }
     }
 }
