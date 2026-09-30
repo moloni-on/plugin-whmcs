@@ -7,6 +7,8 @@ namespace MoloniOn\Services;
 use MoloniOn\Api\MoloniClient;
 use MoloniOn\Enums\ProductType;
 use MoloniOn\Exceptions\ApiException;
+use MoloniOn\Exceptions\ProductLimitException;
+use MoloniOn\Support\Context;
 
 /**
  * Resolves a Moloni ON product id for a WHMCS line item.
@@ -59,12 +61,32 @@ class ProductResolver
             return $this->cache[$reference] = (int) $existing['productId'];
         }
 
+        // The plan's product limit is exposed in the company limits: refuse up
+        // front instead of letting Moloni ON reject the create. Only reached for
+        // a product that doesn't exist yet, so existing products keep resolving.
+        $company = Context::company();
+
+        if ($company !== null && !$company->canCreateProducts()) {
+            throw new ProductLimitException($reference);
+        }
+
         // A product cannot be renamed once created, so it is created under a
         // generic, action-describing name ($createName) rather than the
         // order-specific line name; the line name still shows on the document.
         $productName = ($createName !== null && $createName !== '') ? $createName : $name;
         $insert = $this->buildInsert($productName, $reference, $price, $taxes, $exemptionReason);
-        $created = $this->client->createProduct($insert);
+
+        try {
+            $created = $this->client->createProduct($insert);
+        } catch (ApiException $e) {
+            // The limit can still be hit here (the company is read once per
+            // request, e.g. during a bulk run, or another client created products)
+            if (ProductLimitException::isApiError($e)) {
+                throw new ProductLimitException($reference, $e->getData(), $e);
+            }
+
+            throw $e;
+        }
         $productId = (int) ($created['productId'] ?? 0);
 
         if ($productId <= 0) {

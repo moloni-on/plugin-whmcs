@@ -24,6 +24,12 @@ final class Company
         'tools.webhooks',
     ];
 
+    /**
+     * The plan's product count limit (the `limits` entry with this resource).
+     * Moloni ON refuses a product create once its `remaining` reaches 0.
+     */
+    private const PRODUCTS_RESOURCE = 'products';
+
     /** @var array<string,mixed> */
     private array $company;
 
@@ -34,6 +40,10 @@ final class Company
     {
         foreach ($company['limits'] ?? [] as $key => $limit) {
             if (in_array($limit['moduleId'] ?? '', self::TARGET_PERMISSIONS, true)) {
+                continue;
+            }
+
+            if (($limit['resource'] ?? null) === self::PRODUCTS_RESOURCE) {
                 continue;
             }
 
@@ -113,6 +123,26 @@ final class Company
     public function hasWebhooks(): bool
     {
         return $this->isAllowed('tools.webhooks');
+    }
+
+    // ---- Limits -----------------------------------------------------------
+
+    /**
+     * Whether the plan still has room for another product. No products entry
+     * (unexpected, or the company could not be loaded) means don't block, and
+     * let Moloni ON decide.
+     */
+    public function canCreateProducts(): bool
+    {
+        foreach ($this->company['limits'] ?? [] as $limit) {
+            if (($limit['resource'] ?? null) !== self::PRODUCTS_RESOURCE) {
+                continue;
+            }
+
+            return (int) ($limit['remaining'] ?? 0) > 0;
+        }
+
+        return true;
     }
 
     /**

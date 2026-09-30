@@ -46,6 +46,8 @@ class GetCompany extends AbstractOperation
                 limits {
                     moduleId
                     active
+                    resource
+                    remaining
                 }
             }
             options {

@@ -67,4 +67,40 @@ final class CompanyTest extends TestCase
         self::assertSame('tools.apiClients', array_values($limits)[0]['moduleId']);
         self::assertSame('Acme Lda', $company->get('name'));
     }
+
+    public function testProductsLimitEntryIsKeptAlongsideTrackedModules(): void
+    {
+        $company = new Company([
+            'limits' => [
+                ['moduleId' => 'tools.webhooks', 'resource' => null, 'remaining' => 0, 'active' => true],
+                [
+                    'moduleId' => 'productsServices.products',
+                    'resource' => 'products',
+                    'remaining' => 0,
+                    'active' => true,
+                ],
+                ['moduleId' => 'productsServices.stocks', 'resource' => null, 'remaining' => 0, 'active' => true],
+            ],
+        ]);
+
+        self::assertCount(2, $company->getAll()['limits']);
+        self::assertTrue($company->hasWebhooks());
+    }
+
+    public function testCanCreateProductsFollowsRemaining(): void
+    {
+        $withRoom = new Company(['limits' => [['resource' => 'products', 'remaining' => 3, 'active' => true]]]);
+        $full = new Company(['limits' => [['resource' => 'products', 'remaining' => 0, 'active' => true]]]);
+
+        self::assertTrue($withRoom->canCreateProducts());
+        self::assertFalse($full->canCreateProducts());
+    }
+
+    public function testCanCreateProductsDoesNotBlockWithoutAProductsEntry(): void
+    {
+        self::assertTrue((new Company([]))->canCreateProducts());
+        $withoutProducts = new Company(['limits' => [['moduleId' => 'tools.apiClients', 'active' => true]]]);
+
+        self::assertTrue($withoutProducts->canCreateProducts());
+    }
 }
