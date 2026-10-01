@@ -87,13 +87,27 @@ final class CompanyTest extends TestCase
         self::assertTrue($company->hasWebhooks());
     }
 
-    public function testCanCreateProductsFollowsRemaining(): void
+    public function testCanCreateProductsAllowsAnUncappedPlan(): void
     {
-        $withRoom = new Company(['limits' => [['resource' => 'products', 'remaining' => 3, 'active' => true]]]);
-        $full = new Company(['limits' => [['resource' => 'products', 'remaining' => 0, 'active' => true]]]);
+        // Moloni ON reports limit: 0, remaining: 0 for a resource with no cap
+        // (unlimited plan) — this must not be read as "full".
+        $uncapped = new Company(['limits' => [['resource' => 'products', 'limit' => 0, 'remaining' => 0]]]);
+
+        self::assertTrue($uncapped->canCreateProducts());
+    }
+
+    public function testCanCreateProductsBlocksACappedPlanWithNothingLeft(): void
+    {
+        $full = new Company(['limits' => [['resource' => 'products', 'limit' => 10, 'remaining' => 0]]]);
+
+        self::assertFalse($full->canCreateProducts());
+    }
+
+    public function testCanCreateProductsAllowsACappedPlanWithRoomLeft(): void
+    {
+        $withRoom = new Company(['limits' => [['resource' => 'products', 'limit' => 10, 'remaining' => 3]]]);
 
         self::assertTrue($withRoom->canCreateProducts());
-        self::assertFalse($full->canCreateProducts());
     }
 
     public function testCanCreateProductsDoesNotBlockWithoutAProductsEntry(): void

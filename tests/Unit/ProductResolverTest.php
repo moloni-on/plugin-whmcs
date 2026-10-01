@@ -36,9 +36,15 @@ final class ProductResolverTest extends TestCase
         return new ProductResolver($client, $this->createMock(SettingsService::class));
     }
 
-    private function companyWithRemaining(int $remaining): void
+    /**
+     * A capped plan (limit > 0) with the given remaining count. Tests that
+     * need an uncapped plan build the company payload directly.
+     */
+    private function companyWithRemaining(int $remaining, int $limit = 10): void
     {
-        Context::setCompany(['limits' => [['resource' => 'products', 'remaining' => $remaining, 'active' => true]]]);
+        Context::setCompany([
+            'limits' => [['resource' => 'products', 'limit' => $limit, 'remaining' => $remaining, 'active' => true]],
+        ]);
     }
 
     public function testExistingProductResolvesEvenOnAFullPlan(): void
@@ -92,6 +98,20 @@ final class ProductResolverTest extends TestCase
         } catch (ApiException $e) {
             self::assertSame($original, $e);
         }
+    }
+
+    public function testMissingProductOnAnUncappedPlanIsCreated(): void
+    {
+        // Moloni ON reports limit: 0, remaining: 0 for a resource with no cap
+        // (unlimited plan); this must not be read as "full".
+        Context::setCompany([
+            'limits' => [['resource' => 'products', 'limit' => 0, 'remaining' => 0, 'active' => true]],
+        ]);
+        $client = $this->createMock(MoloniClient::class);
+        $client->method('findProductByReference')->willReturn(null);
+        $client->expects(self::once())->method('createProduct')->willReturn(['productId' => 11]);
+
+        self::assertSame(11, $this->resolver($client)->resolveId('Hosting', 10.0, [], '', 'HOST'));
     }
 
     public function testCreatesWhenThePlanHasRoom(): void
