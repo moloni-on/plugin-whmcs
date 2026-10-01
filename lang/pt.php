@@ -154,6 +154,7 @@ return [
     'document_created' => 'Documento criado (ID :id).',
     'document_skipped' => 'Encomenda ignorada: fatura de pagamento em massa, nada a faturar.',
     'document_failed' => 'Não foi possível criar o documento: :error',
+    'product_limit_reached' => 'Não foi possível criar ":reference" no Moloni ON: foi atingido o limite de produtos do plano.',
     'no_orders_selected' => 'Não selecionaste nenhuma encomenda.',
     'bulk_result' => 'Criados :created documento(s); :skipped ignoradas; :failed falharam.',
 ];

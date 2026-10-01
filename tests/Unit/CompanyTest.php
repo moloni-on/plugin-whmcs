@@ -67,4 +67,54 @@ final class CompanyTest extends TestCase
         self::assertSame('tools.apiClients', array_values($limits)[0]['moduleId']);
         self::assertSame('Acme Lda', $company->get('name'));
     }
+
+    public function testProductsLimitEntryIsKeptAlongsideTrackedModules(): void
+    {
+        $company = new Company([
+            'limits' => [
+                ['moduleId' => 'tools.webhooks', 'resource' => null, 'remaining' => 0, 'active' => true],
+                [
+                    'moduleId' => 'productsServices.products',
+                    'resource' => 'products',
+                    'remaining' => 0,
+                    'active' => true,
+                ],
+                ['moduleId' => 'productsServices.stocks', 'resource' => null, 'remaining' => 0, 'active' => true],
+            ],
+        ]);
+
+        self::assertCount(2, $company->getAll()['limits']);
+        self::assertTrue($company->hasWebhooks());
+    }
+
+    public function testCanCreateProductsAllowsAnUncappedPlan(): void
+    {
+        // Moloni ON reports limit: 0, remaining: 0 for a resource with no cap
+        // (unlimited plan) — this must not be read as "full".
+        $uncapped = new Company(['limits' => [['resource' => 'products', 'limit' => 0, 'remaining' => 0]]]);
+
+        self::assertTrue($uncapped->canCreateProducts());
+    }
+
+    public function testCanCreateProductsBlocksACappedPlanWithNothingLeft(): void
+    {
+        $full = new Company(['limits' => [['resource' => 'products', 'limit' => 10, 'remaining' => 0]]]);
+
+        self::assertFalse($full->canCreateProducts());
+    }
+
+    public function testCanCreateProductsAllowsACappedPlanWithRoomLeft(): void
+    {
+        $withRoom = new Company(['limits' => [['resource' => 'products', 'limit' => 10, 'remaining' => 3]]]);
+
+        self::assertTrue($withRoom->canCreateProducts());
+    }
+
+    public function testCanCreateProductsDoesNotBlockWithoutAProductsEntry(): void
+    {
+        self::assertTrue((new Company([]))->canCreateProducts());
+        $withoutProducts = new Company(['limits' => [['moduleId' => 'tools.apiClients', 'active' => true]]]);
+
+        self::assertTrue($withoutProducts->canCreateProducts());
+    }
 }
