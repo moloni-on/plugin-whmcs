@@ -18,6 +18,7 @@ use MoloniOn\Models\Order;
 use MoloniOn\Models\Whmcs;
 use MoloniOn\Support\Context;
 use MoloniOn\Support\CurrencyExchange;
+use MoloniOn\Support\DocumentDate;
 use MoloniOn\Support\FiscalZone;
 use MoloniOn\Support\Hooks;
 use MoloniOn\Support\LineInput;
@@ -256,7 +257,7 @@ class DocumentService
         $documentFiscalZone = $this->companyFiscalZone();
         $taxFiscalZone = $this->resolveTaxFiscalZone($client);
         $exchange = $this->currency->resolve($client);
-        $now = date('Y-m-d H:i:s');
+        $now = DocumentDate::now();
 
         $payload = [
             'customerId' => $this->customers->resolve($client),
@@ -301,20 +302,17 @@ class DocumentService
      * for both made every document due immediately; the invoice due date is the
      * correct payment deadline to print on the document.
      *
+     * The due date is a calendar day, so it is sent as midnight in the
+     * company's timezone — that is the day Moloni ON renders it on.
+     *
      * @param object|null $invoice tblinvoices row
      */
     private function expirationDate($invoice, string $fallback): string
     {
-        $dueDate = trim((string) ($invoice->duedate ?? ''));
+        $company = Context::company();
+        $timezone = $company !== null ? $company->getTimezone() : '';
 
-        // WHMCS stores an unset due date as the zero date; treat that as absent.
-        if ($dueDate === '' || strpos($dueDate, '0000-00-00') === 0) {
-            return $fallback;
-        }
-
-        $timestamp = strtotime($dueDate);
-
-        return $timestamp !== false ? date('Y-m-d H:i:s', $timestamp) : $fallback;
+        return DocumentDate::startOfDay((string) ($invoice->duedate ?? ''), $timezone) ?? $fallback;
     }
 
     /**

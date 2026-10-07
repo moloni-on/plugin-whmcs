@@ -89,6 +89,15 @@ final class Company
     }
 
     /**
+     * The company's timezone name (e.g. "Europe/Lisbon"), or "" when absent.
+     * Moloni ON renders document dates in this timezone.
+     */
+    public function getTimezone(): string
+    {
+        return (string) ($this->company['timezone']['name'] ?? '');
+    }
+
+    /**
      * Predefined tax-exemption reasons for the company's fiscal zone, as
      * `{code,name}` rows. Empty when the zone has no predefined list (in which
      * case the exemption reason is entered as free text). Portugal, for example,

@@ -8,6 +8,7 @@ use MoloniOn\Api\MoloniClient;
 use MoloniOn\Exceptions\ApiException;
 use MoloniOn\Models\Whmcs;
 use MoloniOn\Support\CurrencyExchange;
+use MoloniOn\Support\DocumentDate;
 
 /**
  * Builds a document's payment line from a WHMCS order's payment gateway.
@@ -57,7 +58,7 @@ class PaymentResolver
         return [[
             'paymentMethodId' => $paymentMethodId,
             'paymentMethodName' => $name,
-            'date' => date('Y-m-d H:i:s'),
+            'date' => DocumentDate::now(),
             'value' => $exchange !== null ? $exchange->toBase($value) : $value,
         ]];
     }
