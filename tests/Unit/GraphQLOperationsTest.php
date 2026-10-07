@@ -46,6 +46,11 @@ final class GraphQLOperationsTest extends TestCase
         self::assertSame(['data' => ['documentId' => 10, 'status' => 1]], $variables);
     }
 
+    public function testGetCompanyRequestsTheCompanyTimezone(): void
+    {
+        self::assertMatchesRegularExpression('/timezone\s*\{\s*name\s*\}/', (new GetCompany())->query());
+    }
+
     public function testGetCompanyBuildsCompanyId(): void
     {
         $op = new GetCompany();

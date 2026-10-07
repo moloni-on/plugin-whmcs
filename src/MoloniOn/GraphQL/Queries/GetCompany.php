@@ -7,7 +7,7 @@ namespace MoloniOn\GraphQL\Queries;
 use MoloniOn\GraphQL\AbstractOperation;
 
 /**
- * Fetches a single company's details (fiscal zone, currency, defaults).
+ * Fetches a single company's details (fiscal zone, currency, timezone, defaults).
  */
 class GetCompany extends AbstractOperation
 {
@@ -42,6 +42,9 @@ class GetCompany extends AbstractOperation
                 currency {
                     currencyId
                     iso4217
+                }
+                timezone {
+                    name
                 }
                 limits {
                     moduleId
