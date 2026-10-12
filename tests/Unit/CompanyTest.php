@@ -31,6 +31,12 @@ final class CompanyTest extends TestCase
         self::assertSame(0, $company->getCountry());
     }
 
+    public function testTimezoneReadsThePayloadName(): void
+    {
+        self::assertSame('Europe/Lisbon', (new Company(['timezone' => ['name' => 'Europe/Lisbon']]))->getTimezone());
+        self::assertSame('', (new Company([]))->getTimezone());
+    }
+
     public function testHasApiClientReflectsActiveLimit(): void
     {
         $with = new Company(['limits' => [['moduleId' => 'tools.apiClients', 'active' => true]]]);
