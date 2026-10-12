@@ -152,6 +152,7 @@ return [
     'document_created' => 'Document created (ID :id).',
     'document_skipped' => 'Order skipped: mass-payment invoice, nothing to bill.',
     'document_failed' => 'Document creation failed: :error',
+    'product_limit_reached' => 'Could not create ":reference" in Moloni ON: the plan\'s product limit has been reached.',
     'no_orders_selected' => 'No orders were selected.',
     'bulk_result' => ':created document(s) created, :skipped skipped, :failed failed.',
 ];
