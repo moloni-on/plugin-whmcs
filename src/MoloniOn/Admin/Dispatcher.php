@@ -76,6 +76,8 @@ class Dispatcher
             $this->verifyCsrf();
         }
 
+        $authenticated = false;
+
         try {
             $auth = $this->container->auth();
             $authenticated = $auth->ensureAuthenticated();
@@ -130,6 +132,12 @@ class Dispatcher
                 $this->handleOperation($op);
             }
         } catch (AuthException $e) {
+            // Only a 401 throws this once authenticated (revoked token, deleted client):
+            // drop the dead session so Connect works again instead of looping on login.
+            if ($authenticated) {
+                $this->container->auth()->logout();
+            }
+
             $this->error($e->getMessage());
 
             return $this->renderStandalone('login');
