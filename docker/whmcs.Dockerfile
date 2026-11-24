@@ -17,6 +17,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
+# --- Run as non-root ------------------------------------------------------
+# Apache's master process normally starts as root (to bind port 80) and drops
+# privileges to www-data for workers; running the whole process as www-data
+# means it can't bind a privileged port, so move Apache to 8080 instead and
+# own the dirs it writes to (docroot, PID/lock/log dirs).
+RUN sed -i 's/^Listen 80$/Listen 8080/' /etc/apache2/ports.conf \
+    && sed -i 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-available/000-default.conf \
+    && chown -R www-data:www-data /var/www/html /var/run/apache2 /var/lock/apache2 /var/log/apache2
+
 # --- ionCube Loader (required by WHMCS) ---------------------------------
 # Uncomment and adjust for your platform, then rebuild:
 #
@@ -30,3 +39,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # See https://docs.whmcs.com/System_Requirements for supported PHP + loader versions.
 
 WORKDIR /var/www/html
+EXPOSE 8080
+USER www-data
