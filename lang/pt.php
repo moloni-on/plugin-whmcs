@@ -26,11 +26,8 @@ return [
 
     // Início de sessão
     'login_title' => 'Ligar ao Moloni ON',
-    'login_intro' => 'Insere as tuas credenciais de API do Moloni ON para autorizar esta instalação do WHMCS.',
-    'developer_id' => 'ID de cliente da API',
-    'client_secret' => 'Client secret',
+    'login_intro' => 'Liga esta instalação do WHMCS à tua conta Moloni ON.',
     'connect' => 'Ligar',
-    'credentials_required' => 'Indica o ID de cliente e o client secret da API.',
 
     // Seleção de empresa
     'company_title' => 'Seleciona uma empresa',
@@ -143,6 +140,10 @@ return [
 
     // OAuth / diversos
     'oauth_state_mismatch' => 'A autorização falhou: o token de segurança não corresponde. Tenta ligar novamente.',
+    'oauth_callback_error' => 'O Moloni ON não autorizou a ligação. Tenta novamente.',
+    'connect_https_required' => 'A tua instalação do WHMCS tem de usar HTTPS para se ligar ao Moloni ON.',
+    'connect_rate_limited' => 'Demasiadas tentativas de ligação. Tenta novamente mais tarde.',
+    'connect_failed' => 'Não foi possível ligar ao Moloni ON. Tenta novamente.',
     'redirecting' => 'A redirecionar para o Moloni ON…',
     'redirect_continue' => 'continuar',
     'pdf_download_failed' => 'Não foi possível transferir o PDF.',

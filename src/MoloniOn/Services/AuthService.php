@@ -11,18 +11,22 @@ use MoloniOn\Exceptions\AuthException;
 use MoloniOn\Facades\LoggerFacade;
 use MoloniOn\Models\Auth;
 use MoloniOn\Support\Context;
+use MoloniOn\Support\Pkce;
 
 /**
- * Drives the Moloni ON OAuth2 authorization-code flow and keeps the runtime
- * {@see Context} populated with the active session.
+ * Drives the Moloni ON OAuth2 authorization-code + PKCE flow and keeps the
+ * runtime {@see Context} populated with the active session.
  *
- * Flow: setClient() -> authorizeUrl() (redirect) -> exchangeCode(callback) ->
- * ensureAuthenticated() (loads/refreshes tokens) -> selectCompany().
+ * Flow: startConnect() (register a public client, redirect) -> verifyState()
+ * + exchangeCode() (callback) -> ensureAuthenticated() (loads/refreshes
+ * tokens) -> selectCompany(). A stored row with a non-empty client_secret is
+ * a legacy, developer-made API client and keeps using the pre-PKCE grant
+ * (see {@see \MoloniOn\Api\ApiClient::grant()}).
  */
 class AuthService
 {
-    /** Session key holding the one-time OAuth CSRF `state`. */
-    private const STATE_KEY = 'moloni_on_oauth_state';
+    /** Session key holding the pending OAuth `state` + PKCE verifier. */
+    private const OAUTH_KEY = 'moloni_on_oauth';
 
     /** Refresh access tokens this many seconds before they actually expire. */
     private const EXPIRY_SKEW = 60;
@@ -44,56 +48,65 @@ class AuthService
     }
 
     /**
-     * Store developer credentials (resets any existing session).
+     * Register a public OAuth client for $redirectUri and start the
+     * authorization-code + PKCE flow. Stores the returned client id with an
+     * empty secret (marking it public everywhere else) and returns the URL
+     * the admin must be redirected to in order to authorize it.
+     *
+     * Only ever called while no session is authenticated (the caller gates
+     * this), so resetting the stored client here never wipes a connected
+     * store.
+     *
+     * @throws AuthException when registration is rejected; the message is
+     *         already suited for display.
      */
-    public function setClient(string $clientId, string $clientSecret): void
+    public function startConnect(string $redirectUri): string
     {
-        Auth::setClient($clientId, $clientSecret);
-    }
+        $clientId = $this->api->register($redirectUri);
 
-    /**
-     * Build the URL the admin must be redirected to in order to authorize.
-     */
-    public function authorizeUrl(string $redirectUri): string
-    {
-        $row = Auth::row();
-        $clientId = (string) ($row['client_id'] ?? '');
+        Auth::setClient($clientId, '');
 
-        return $this->api->authorizeUrl($clientId, $redirectUri, $this->issueState());
-    }
-
-    /**
-     * Generate and remember a one-time CSRF `state` for the OAuth redirect.
-     */
-    private function issueState(): string
-    {
+        $verifier = Pkce::verifier();
         $state = bin2hex(random_bytes(16));
 
         if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION[self::STATE_KEY] = $state;
+            $_SESSION[self::OAUTH_KEY] = ['state' => $state, 'verifier' => $verifier];
         }
 
-        return $state;
+        return $this->api->authorizeUrl($clientId, $redirectUri, Pkce::challenge($verifier), $state);
     }
 
     /**
-     * Validate (and consume) the `state` returned on the OAuth callback.
-     * Fails closed when no state was issued for this session.
+     * Validate (and consume) the `state` returned on the OAuth callback, and
+     * return the PKCE verifier stored alongside it. Fails closed (returns
+     * null) when no connect is pending for this session or the state does
+     * not match — timing-safe, single use.
      */
-    public function verifyState(string $state): bool
+    public function verifyState(string $state): ?string
     {
-        $expected = $_SESSION[self::STATE_KEY] ?? '';
-        unset($_SESSION[self::STATE_KEY]);
+        $stored = $_SESSION[self::OAUTH_KEY] ?? null;
+        unset($_SESSION[self::OAUTH_KEY]);
 
-        return $state !== '' && is_string($expected) && $expected !== '' && hash_equals($expected, $state);
+        if (!is_array($stored) || empty($stored['state']) || empty($stored['verifier'])) {
+            return null;
+        }
+
+        if ($state === '' || !hash_equals((string) $stored['state'], $state)) {
+            return null;
+        }
+
+        return (string) $stored['verifier'];
     }
 
     /**
-     * Exchange an authorization code (from the OAuth callback) for tokens.
+     * Exchange an authorization code (from the OAuth callback) for tokens. A
+     * legacy row (non-empty stored secret) sends exactly the pre-PKCE grant;
+     * a public client (empty secret) proves itself with $codeVerifier +
+     * $redirectUri instead.
      *
      * @throws AuthException
      */
-    public function exchangeCode(string $code): void
+    public function exchangeCode(string $code, string $codeVerifier, string $redirectUri): void
     {
         $row = Auth::row();
 
@@ -101,7 +114,13 @@ class AuthService
             throw new AuthException('No stored credentials to complete authentication.');
         }
 
-        $tokens = $this->api->grant((string) $row['client_id'], (string) $row['client_secret'], $code);
+        $tokens = $this->api->grant(
+            (string) $row['client_id'],
+            (string) $row['client_secret'],
+            $code,
+            $codeVerifier,
+            $redirectUri
+        );
         $this->storeTokens($tokens);
 
         LoggerFacade::info('Authenticated with Moloni ON.');

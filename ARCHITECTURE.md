@@ -256,9 +256,12 @@ class ApiClient {
     // GraphQL: injects the active companyId + Bearer token from Context.
     public function request(string $operation, string $query, array $variables = []): array {}
 
-    // OAuth2 authorization-code flow.
-    public function authorizeUrl(string $clientId, string $redirectUri): string {}
-    public function grant(string $clientId, string $clientSecret, string $code): array {}   // code -> tokens
+    // OAuth2 authorization-code + PKCE flow. A public client (register(), empty
+    // $clientSecret) omits clientSecret on grant/refresh and proves itself with
+    // $codeVerifier/$redirectUri instead; a legacy client (non-empty secret) is unchanged.
+    public function register(string $redirectUri): string {}   // RFC 7591 dynamic client registration -> client_id
+    public function authorizeUrl(string $clientId, string $redirectUri, string $codeChallenge, string $state): string {}
+    public function grant(string $clientId, string $clientSecret, string $code, string $codeVerifier = '', string $redirectUri = ''): array {}   // code -> tokens
     public function refresh(string $clientId, string $clientSecret, string $refreshToken): ?array {}
 
     // Binary GET for media (e.g. document PDFs); shares the cURL/SSL setup.
@@ -565,14 +568,21 @@ See the hook table in [CLAUDE.md](CLAUDE.md) for the full list and payloads.
 ## Security Considerations
 
 1. **OAuth2 Credential & Token Storage**
-   - Client id/secret and access/refresh tokens stored in the single-row `mod_moloni_on_auth` table
+   - Client id/secret and access/refresh tokens stored in the single-row `mod_moloni_on_auth` table.
+     Connecting registers a public OAuth client (RFC 7591, `ApiClient::register()`) and stores it with
+     an empty secret; a stored non-empty secret marks a legacy, developer-made API client, which keeps
+     using the pre-PKCE grant/refresh request unchanged
+   - The connect flow uses PKCE (S256): a code verifier + challenge are generated per attempt and the
+     verifier is kept in the admin's PHP session alongside the CSRF `state`, consumed once on callback
    - Access limited to authenticated WHMCS admins
    - Tokens auto-refresh; when the refresh token is expired or the refresh grant call fails, the session tokens are cleared (`AuthService::logout`) and the admin must run the full login flow again
 
 2. **API Communication**
-   - HTTPS only (enforced by Moloni ON); SSL peer + host verification enabled in the cURL client
+   - HTTPS required to register a new connection (a loopback `http://` address is allowed for local
+     development only); SSL peer + host verification enabled in the cURL client
    - Bearer access token in the `Authorization` header (never in the query string)
-   - OAuth grant/refresh uses form-encoded POST to `/v1/auth/grant`
+   - OAuth grant/refresh uses form-encoded POST to `/v1/auth/grant`; registration uses JSON POST to
+     `/v1/auth/register`
 
 3. **WHMCS Integration**
    - Verify admin session before operations

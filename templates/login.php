@@ -2,8 +2,9 @@
 /**
  * Login / connect page.
  *
- * Collects the Moloni ON developer credentials (API client id + secret) and
- * starts the OAuth2 authorization-code flow via op=connect.
+ * Starts the Moloni ON OAuth2 authorization-code + PKCE flow via op=connect.
+ * No credentials to enter: the module registers a public OAuth client for
+ * this WHMCS installation and redirects to Moloni ON to authorize it.
  *
  * @var callable $lang
  * @var callable $url
@@ -18,16 +19,6 @@
     <form method="post" action="<?= $e($url()) ?>">
         <?= $csrf() ?>
         <input type="hidden" name="op" value="connect">
-
-        <div class="form-group mb-3">
-            <label for="developer_id"><?= $e($lang('developer_id')) ?></label>
-            <input type="text" class="form-control" id="developer_id" name="developer_id" required autocomplete="off">
-        </div>
-
-        <div class="form-group mb-3">
-            <label for="client_secret"><?= $e($lang('client_secret')) ?></label>
-            <input type="password" class="form-control" id="client_secret" name="client_secret" required autocomplete="off">
-        </div>
 
         <button type="submit" class="btn btn-primary"><?= $e($lang('connect')) ?></button>
     </form>

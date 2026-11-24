@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MoloniOn\Admin;
 
 use MoloniOn\Enums\DocumentType;
+use MoloniOn\Exceptions\ApiException;
 use MoloniOn\Exceptions\AuthException;
 use MoloniOn\Exceptions\DocumentException;
 use MoloniOn\Exceptions\MoloniException;
@@ -76,13 +77,25 @@ class Dispatcher
         }
 
         try {
-            // 1. Start the OAuth flow from the login form.
-            if ($op === 'connect') {
+            $auth = $this->container->auth();
+            $authenticated = $auth->ensureAuthenticated();
+
+            // 1. Start the OAuth flow from the login form. A stale Connect
+            // click (e.g. a second admin tab) must not wipe an already
+            // connected store, so this only runs while no session exists yet.
+            // POST only, so the CSRF check above always applies.
+            if ($op === 'connect' && $this->request->isPost() && !$authenticated) {
                 return $this->connect();
             }
 
-            // 2. Require a valid OAuth session (completing the callback if any).
-            if (!$this->resolveAuthenticatedState()) {
+            // 2. Complete a pending OAuth callback, if any. Only attempted
+            // while not authenticated, so a stray ?code/?error can never
+            // disconnect an already-connected store.
+            if (!$authenticated) {
+                $authenticated = $this->completeCallback();
+            }
+
+            if (!$authenticated) {
                 return $this->renderStandalone('login');
             }
 
@@ -129,25 +142,40 @@ class Dispatcher
     }
 
     /**
-     * Resolve the current OAuth session, completing the authorization-code
-     * callback when one is present — but only after validating the CSRF state
-     * nonce issued when the flow started.
+     * Complete a pending OAuth callback. A `?error=` from Moloni ON keeps the
+     * login screen and stores nothing; a `?code=` is exchanged for tokens
+     * once its `state` validates against the pending connect (timing-safe,
+     * single use, bound to the PKCE verifier). Only called while not
+     * authenticated — see dispatch() — so this can never tear down a
+     * connected store.
      */
-    private function resolveAuthenticatedState(): bool
+    private function completeCallback(): bool
     {
-        $auth = $this->container->auth();
-        $authenticated = $auth->ensureAuthenticated();
+        if ($this->request->query('error') !== '') {
+            $this->error(Lang::get('oauth_callback_error'));
 
-        if (!$authenticated && $this->request->query('code') !== '') {
-            if (!$auth->verifyState($this->request->query('state'))) {
-                throw new AuthException(Lang::get('oauth_state_mismatch'));
-            }
-
-            $auth->exchangeCode($this->request->query('code'));
-            $authenticated = $auth->ensureAuthenticated();
+            return false;
         }
 
-        return $authenticated;
+        if ($this->request->query('code') === '') {
+            return false;
+        }
+
+        $auth = $this->container->auth();
+        $verifier = $auth->verifyState($this->request->query('state'));
+
+        if ($verifier === null) {
+            throw new AuthException(Lang::get('oauth_state_mismatch'));
+        }
+
+        try {
+            $auth->exchangeCode($this->request->query('code'), $verifier, $this->absoluteModuleUrl());
+        } catch (ApiException $e) {
+            // A rejected code (expired, PKCE/redirect mismatch) must land on the login page.
+            throw new AuthException(Lang::get('connect_failed'));
+        }
+
+        return $auth->ensureAuthenticated();
     }
 
     /**
@@ -296,19 +324,20 @@ class Dispatcher
         $this->success(Lang::get('settings_saved'));
     }
 
+    /**
+     * Start the OAuth connect flow: register a public client for this
+     * installation and redirect to Moloni ON to authorize it. No credentials
+     * to collect — see {@see \MoloniOn\Services\AuthService::startConnect()}.
+     */
     private function connect(): string
     {
-        $developerId = trim($this->request->post('developer_id'));
-        $clientSecret = trim($this->request->post('client_secret'));
-
-        if ($developerId === '' || $clientSecret === '') {
-            $this->error(Lang::get('credentials_required'));
+        try {
+            $url = $this->container->auth()->startConnect($this->absoluteModuleUrl());
+        } catch (MoloniException $e) {
+            $this->error($e->getMessage());
 
             return $this->renderStandalone('login');
         }
-
-        $this->container->auth()->setClient($developerId, $clientSecret);
-        $url = $this->container->auth()->authorizeUrl($this->absoluteModuleUrl());
 
         return $this->redirect($url);
     }

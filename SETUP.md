@@ -178,18 +178,22 @@ class Installer {
 1. Navigate: **Addons** → **Moloni ON**
 2. You should see the **Login** page
 
-### 4b. Authenticate with Moloni ON (OAuth2)
-The module uses the Moloni ON OAuth2 authorization-code flow — there is no
-static API key.
-1. In your Moloni ON account, create an **API client** to obtain an **API Client ID**
-   (developer id) and a **Client Secret**
-2. In the WHMCS Moloni ON module login page, enter the **API Client ID** and **Client Secret**
-   and click **Connect**
-3. You're redirected to the Moloni ON authorization center (https://ac.molonion.pt/) to
+### 4b. Authenticate with Moloni ON (OAuth2 + PKCE)
+The module uses the Moloni ON OAuth2 authorization-code flow with PKCE — there is no
+static API key, and no API client to create: just click **Connect**.
+1. In the WHMCS Moloni ON module login page, click **Connect**. This requires HTTPS: the
+   module registers a public OAuth client for this WHMCS installation's address, so Moloni ON
+   must be able to redirect back to an `https://` URL (a loopback `http://` address is allowed
+   for local development only)
+2. You're redirected to the Moloni ON authorization center (https://ac.molonion.pt/) to
    authorize this WHMCS installation
-4. After authorizing, Moloni ON redirects back to the module with a `code`, which the module
+3. After authorizing, Moloni ON redirects back to the module with a `code`, which the module
    exchanges for **access** and **refresh** tokens (stored in `mod_moloni_on_auth`)
-5. On success, you're redirected to **Company Select**
+4. On success, you're redirected to **Company Select**
+
+An install that was connected with a developer-made API client (client id + secret entered
+manually) before this flow existed keeps working unchanged — only new connections register a
+public client.
 
 ### 4c. Select Moloni ON Company
 1. Choose your active Moloni ON company from the list
