@@ -26,15 +26,15 @@ Portugal's cloud invoicing platform — without re-typing anything or missing a 
 
 - 🟢 WHMCS **7.0 or newer**
 - 🐘 PHP **7.4+** with the `curl`, `json` and `mbstring` extensions
-- 🔑 A Moloni ON account with **API credentials** (API Client ID + Client Secret)
+- 🔑 A Moloni ON account, and an HTTPS address for your WHMCS install (no API client to create)
 
 ## 🚀 Installing
 
 1. 📂 Copy the module into your WHMCS install at `modules/addons/moloni_on`.
 2. 🧩 Activate **Moloni ON** under *Setup → Addon Modules*.
-3. 🔓 Open it from *Addons → Moloni ON* and sign in to your Moloni ON account.
+3. 🔓 Open it from *Addons → Moloni ON* and click **Connect** to authorize with your Moloni ON account.
 
-> 📖 The full step-by-step guide — including OAuth setup and the exact settings to choose —
+> 📖 The full step-by-step guide — including the exact settings to choose —
 > is in **[SETUP.md](SETUP.md)**.
 
 ## ⚙️ Configuring

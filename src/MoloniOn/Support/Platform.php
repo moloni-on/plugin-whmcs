@@ -36,6 +36,9 @@ final class Platform
     /** OAuth grant endpoint (code exchange and token refresh). */
     public const AUTH_GRANT = self::API_URL . '/auth/grant';
 
+    /** OAuth dynamic client registration endpoint (RFC 7591). */
+    public const AUTH_REGISTER = self::API_URL . '/auth/register';
+
     /** User-agent sent on every API request. */
     public const USER_AGENT = 'WhmcsMoloniOn/1.0';
 

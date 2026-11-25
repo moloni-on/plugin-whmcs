@@ -24,11 +24,8 @@ return [
 
     // Login
     'login_title' => 'Connect to Moloni ON',
-    'login_intro' => 'Enter your Moloni ON API credentials to authorize this WHMCS installation.',
-    'developer_id' => 'API Client ID',
-    'client_secret' => 'Client secret',
+    'login_intro' => 'Connect this WHMCS installation to your Moloni ON account.',
     'connect' => 'Connect',
-    'credentials_required' => 'Please provide both the API client ID and secret.',
 
     // Company selection
     'company_title' => 'Select a company',
@@ -141,6 +138,10 @@ return [
 
     // OAuth / misc
     'oauth_state_mismatch' => 'Authorization failed: the security token did not match. Please try connecting again.',
+    'oauth_callback_error' => 'Moloni ON did not authorize the connection. Please try again.',
+    'connect_https_required' => 'Your WHMCS installation must use HTTPS to connect to Moloni ON.',
+    'connect_rate_limited' => 'Too many connection attempts. Please try again later.',
+    'connect_failed' => 'Could not connect to Moloni ON. Please try again.',
     'redirecting' => 'Redirecting to Moloni ON…',
     'redirect_continue' => 'continue',
     'pdf_download_failed' => 'Could not download PDF.',

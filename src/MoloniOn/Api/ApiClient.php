@@ -7,6 +7,7 @@ namespace MoloniOn\Api;
 use MoloniOn\Exceptions\ApiException;
 use MoloniOn\Exceptions\AuthException;
 use MoloniOn\Support\Context;
+use MoloniOn\Support\Lang;
 use MoloniOn\Support\Platform;
 
 /**
@@ -88,19 +89,24 @@ class ApiClient
     /**
      * Exchange an authorization code for access/refresh tokens.
      *
+     * A legacy client (non-empty $clientSecret) sends exactly the pre-PKCE
+     * request. A public client (empty secret, from {@see register()}) omits
+     * clientSecret and instead proves possession of the authorization request
+     * via $codeVerifier + $redirectUri (snake_case, per the grant endpoint's
+     * RFC 7636 fields).
+     *
      * @return array{accessToken:string,refreshToken:string}
      * @throws AuthException
      */
-    public function grant(string $clientId, string $clientSecret, string $code): array
-    {
-        $fields = http_build_query([
-            'grantType' => 'authorization_code',
-            'apiClientId' => $clientId,
-            'clientSecret' => $clientSecret,
-            'code' => $code,
-        ]);
-
-        $parsed = $this->grantRequest($fields);
+    public function grant(
+        string $clientId,
+        string $clientSecret,
+        string $code,
+        string $codeVerifier = '',
+        string $redirectUri = ''
+    ): array {
+        $fields = self::grantFields($clientId, $clientSecret, $code, $codeVerifier, $redirectUri);
+        $parsed = $this->grantRequest(http_build_query($fields));
 
         if (!isset($parsed['accessToken'], $parsed['refreshToken'])) {
             throw new AuthException(
@@ -110,6 +116,45 @@ class ApiClient
         }
 
         return $parsed;
+    }
+
+    /**
+     * Build the `auth/grant` (authorization_code) POST fields. A legacy
+     * client (non-empty $clientSecret) gets exactly the pre-PKCE fields
+     * (grantType, apiClientId, clientSecret, code); a public client (empty
+     * secret) omits clientSecret and adds the PKCE/redirect proof instead.
+     * Pure and side-effect-free so it can be unit tested without a network
+     * call.
+     *
+     * @return array<string,string>
+     */
+    public static function grantFields(
+        string $clientId,
+        string $clientSecret,
+        string $code,
+        string $codeVerifier = '',
+        string $redirectUri = ''
+    ): array {
+        $fields = [
+            'grantType' => 'authorization_code',
+            'apiClientId' => $clientId,
+        ];
+
+        if ($clientSecret !== '') {
+            $fields['clientSecret'] = $clientSecret;
+        }
+
+        $fields['code'] = $code;
+
+        if ($codeVerifier !== '') {
+            $fields['code_verifier'] = $codeVerifier;
+        }
+
+        if ($redirectUri !== '') {
+            $fields['redirect_uri'] = $redirectUri;
+        }
+
+        return $fields;
     }
 
     /**
@@ -126,12 +171,7 @@ class ApiClient
      */
     public function refresh(string $clientId, string $clientSecret, string $refreshToken): ?array
     {
-        $fields = http_build_query([
-            'grantType' => 'refresh_token',
-            'apiClientId' => $clientId,
-            'clientSecret' => $clientSecret,
-            'refreshToken' => $refreshToken,
-        ]);
+        $fields = http_build_query(self::refreshFields($clientId, $clientSecret, $refreshToken));
 
         try {
             $parsed = $this->grantRequest($fields);
@@ -151,19 +191,87 @@ class ApiClient
     }
 
     /**
-     * Build the OAuth2 authorize URL to redirect the admin to.
+     * Build the `auth/grant` (refresh_token) POST fields: a legacy client
+     * (non-empty $clientSecret) gets exactly the pre-PKCE fields, a public
+     * client (empty secret) omits clientSecret. Pure and side-effect-free so
+     * it can be unit tested without a network call.
+     *
+     * @return array<string,string>
      */
-    public function authorizeUrl(string $clientId, string $redirectUri, string $state = ''): string
+    public static function refreshFields(string $clientId, string $clientSecret, string $refreshToken): array
     {
-        $url = Platform::AUTH_AUTHORIZE
-            . '?apiClientId=' . rawurlencode($clientId)
-            . '&redirectUri=' . rawurlencode($redirectUri);
+        $fields = [
+            'grantType' => 'refresh_token',
+            'apiClientId' => $clientId,
+        ];
 
-        if ($state !== '') {
-            $url .= '&state=' . rawurlencode($state);
+        if ($clientSecret !== '') {
+            $fields['clientSecret'] = $clientSecret;
         }
 
-        return $url;
+        $fields['refreshToken'] = $refreshToken;
+
+        return $fields;
+    }
+
+    /**
+     * Build the OAuth2 authorize URL to redirect the admin to: an
+     * authorization-code request with PKCE (S256). The authorize endpoint's
+     * fields are snake_case only (unlike grant, which accepts either casing).
+     */
+    public function authorizeUrl(string $clientId, string $redirectUri, string $codeChallenge, string $state): string
+    {
+        return Platform::AUTH_AUTHORIZE
+            . '?response_type=code'
+            . '&client_id=' . rawurlencode($clientId)
+            . '&redirect_uri=' . rawurlencode($redirectUri)
+            . '&code_challenge=' . rawurlencode($codeChallenge)
+            . '&code_challenge_method=S256'
+            . '&state=' . rawurlencode($state);
+    }
+
+    /**
+     * Register a public OAuth client for this installation (RFC 7591 dynamic
+     * client registration) and return its client_id. Moloni ON returns the
+     * same client for an identical (client_name, redirect_uris) pair, so
+     * nothing besides the returned id needs to be kept locally — it is safe
+     * to call this again on every Connect click.
+     *
+     * @throws AuthException on a rejected or failed registration, with a
+     *         message already suited for display (HTTPS required / rate
+     *         limited / generic).
+     */
+    public function register(string $redirectUri): string
+    {
+        $body = (string) json_encode([
+            'client_name' => 'Moloni ON WHMCS (' . (string) parse_url($redirectUri, PHP_URL_HOST) . ')',
+            'redirect_uris' => [$redirectUri],
+        ]);
+
+        $result = $this->httpPost(
+            Platform::AUTH_REGISTER,
+            $body,
+            ['Content-Type: application/json', 'User-Agent: ' . Platform::USER_AGENT]
+        );
+
+        if ($result['status'] === 429) {
+            throw new AuthException(Lang::get('connect_rate_limited'));
+        }
+
+        $parsed = json_decode($result['body'], true);
+
+        if (is_array($parsed) && !empty($parsed['client_id'])) {
+            return (string) $parsed['client_id'];
+        }
+
+        if (is_array($parsed) && ($parsed['error'] ?? '') === 'invalid_redirect_uri') {
+            throw new AuthException(Lang::get('connect_https_required'));
+        }
+
+        throw new AuthException(
+            Lang::get('connect_failed'),
+            ['status' => $result['status'], 'response' => $this->redactSecrets(is_array($parsed) ? $parsed : [])]
+        );
     }
 
     /**
